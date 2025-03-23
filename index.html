@@ -221,99 +221,119 @@
             isDrawing = true;
         }
 
-        // Инициализация Mediapipe Hands
-        const hands = new Hands({
-            locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-            }
-        });
-        hands.setOptions({
-            maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.7
-        });
+        // Инициализация Mediapipe Hands и Camera
+        async function init() {
+            try {
+                // Запрашиваем доступ к камере
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                videoElement.srcObject = stream;
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    resizeCanvases();
+                };
 
-        // Обработка результатов от Mediapipe
-        hands.onResults((results) => {
-            // Обновляем размеры canvas при получении первых данных
-            if (!outputCanvas.width || !outputCanvas.height) {
-                resizeCanvases();
-            }
-
-            // Отрисовываем видео-кадр на основном canvas
-            outputCtx.save();
-            outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
-            outputCtx.drawImage(results.image, 0, 0, outputCanvas.width, outputCanvas.height);
-
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-
-                // Вычисляем ограничивающий прямоугольник для руки
-                let minX = 1, minY = 1, maxX = 0, maxY = 0;
-                landmarks.forEach(pt => {
-                    if (pt.x < minX) minX = pt.x;
-                    if (pt.y < minY) minY = pt.y;
-                    if (pt.x > maxX) maxX = pt.x;
-                    if (pt.y > maxY) maxY = pt.y;
+                // Инициализация Mediapipe Hands
+                const hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    }
                 });
-                const boxX = minX * outputCanvas.width;
-                const boxY = minY * outputCanvas.height;
-                const boxW = (maxX - minX) * outputCanvas.width;
-                const boxH = (maxY - minY) * outputCanvas.height;
-                outputCtx.strokeStyle = 'lime';
-                outputCtx.lineWidth = 3;
-                outputCtx.strokeRect(boxX, boxY, boxW, boxH);
+                hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.7,
+                    minTrackingConfidence: 0.7
+                });
 
-                // Логика распознавания жестов
-                const now = Date.now();
-                if (now - lastTimeFist > 700) {
-                    const fist = isFist(landmarks);
-                    if (fist !== lastFistState) {
-                        lastFistState = fist;
-                        lastTimeFist = now;
-                        if (fist) {
-                            fistCount++;
-                            console.log("Кулак обнаружен. Счёт:", fistCount);
+                // Обработка результатов от Mediapipe
+                hands.onResults((results) => {
+                    // Обновляем размеры canvas при получении первых данных
+                    if (!outputCanvas.width || !outputCanvas.height) {
+                        resizeCanvases();
+                    }
+
+                    // Отрисовываем видео-кадр на основном canvas
+                    outputCtx.save();
+                    outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+                    outputCtx.drawImage(results.image, 0, 0, outputCanvas.width, outputCanvas.height);
+
+                    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                        const landmarks = results.multiHandLandmarks[0];
+
+                        // Вычисляем ограничивающий прямоугольник для руки
+                        let minX = 1, minY = 1, maxX = 0, maxY = 0;
+                        landmarks.forEach(pt => {
+                            if (pt.x < minX) minX = pt.x;
+                            if (pt.y < minY) minY = pt.y;
+                            if (pt.x > maxX) maxX = pt.x;
+                            if (pt.y > maxY) maxY = pt.y;
+                        });
+                        const boxX = minX * outputCanvas.width;
+                        const boxY = minY * outputCanvas.height;
+                        const boxW = (maxX - minX) * outputCanvas.width;
+                        const boxH = (maxY - minY) * outputCanvas.height;
+                        outputCtx.strokeStyle = 'lime';
+                        outputCtx.lineWidth = 3;
+                        outputCtx.strokeRect(boxX, boxY, boxW, boxH);
+
+                        // Логика распознавания жестов
+                        const now = Date.now();
+                        if (now - lastTimeFist > 700) {
+                            const fist = isFist(landmarks);
+                            if (fist !== lastFistState) {
+                                lastFistState = fist;
+                                lastTimeFist = now;
+                                if (fist) {
+                                    fistCount++;
+                                    console.log("Кулак обнаружен. Счёт:", fistCount);
+                                }
+                            }
+                        }
+                        if (!gestureActive && fistCount >= 2 && isIndexPointing(landmarks)) {
+                            gestureActive = true;
+                            isDrawing = false;
+                            console.log("Режим рисования активирован");
+                            infoDiv.textContent = "Режим рисования: активен. Жест OK для очистки.";
+                        }
+                        if (gestureActive) {
+                            const indexTip = landmarks[8];
+                            const x = indexTip.x * drawCanvas.width;
+                            const y = indexTip.y * drawCanvas.height;
+                            draw(x, y);
+                        }
+                        if (gestureActive && isOkGesture(landmarks)) {
+                            console.log("Жест OK обнаружен, очистка холста");
+                            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                            gestureActive = false;
+                            fistCount = 0;
+                            isDrawing = false;
+                            infoDiv.textContent = "Жесты: два раза сжать/разжать кулак + указательный = рисование; OK = очистить";
                         }
                     }
-                }
-                if (!gestureActive && fistCount >= 2 && isIndexPointing(landmarks)) {
-                    gestureActive = true;
-                    isDrawing = false;
-                    console.log("Режим рисования активирован");
-                    infoDiv.textContent = "Режим рисования: активен. Жест OK для очистки.";
-                }
-                if (gestureActive) {
-                    const indexTip = landmarks[8];
-                    const x = indexTip.x * drawCanvas.width;
-                    const y = indexTip.y * drawCanvas.height;
-                    draw(x, y);
-                }
-                if (gestureActive && isOkGesture(landmarks)) {
-                    console.log("Жест OK обнаружен, очистка холста");
-                    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-                    gestureActive = false;
-                    fistCount = 0;
-                    isDrawing = false;
-                    infoDiv.textContent = "Жесты: два раза сжать/разжать кулак + указательный = рисование; OK = очистить";
-                }
+                    outputCtx.restore();
+                });
+
+                // Инициализация камеры через утилиты Mediapipe
+                const camera = new Camera(videoElement, {
+                    onFrame: async () => {
+                        await hands.send({ image: videoElement });
+                    },
+                    width: 640,
+                    height: 480
+                });
+                camera.start();
+
+                // При изменении размера окна – обновляем размеры canvas
+                window.addEventListener('resize', resizeCanvases);
+
+            } catch (error) {
+                console.error("Ошибка при инициализации:", error);
+                alert("Не удалось получить доступ к камере. Пожалуйста, убедитесь, что камера подключена и разрешен доступ.");
             }
-            outputCtx.restore();
-        });
+        }
 
-        // Инициализация камеры через утилиты Mediapipe
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({ image: videoElement });
-            },
-            width: 640,
-            height: 480
-        });
-        camera.start();
-
-        // При изменении размера окна – обновляем размеры canvas
-        window.addEventListener('resize', resizeCanvases);
+        // Вызываем функцию инициализации
+        init();
     </script>
 </body>
 </html>
