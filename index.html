@@ -80,14 +80,62 @@
             border-radius: 5px;
             z-index: 20;
         }
+        
+        #startButton {
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 30;
+            margin-bottom: 20px;
+        }
+        
+        #startButton:hover {
+            background-color: #45a049;
+        }
+        
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 25;
+            color: white;
+            text-align: center;
+        }
+        
+        .overlay h1 {
+            margin-bottom: 30px;
+        }
+        
+        .overlay p {
+            margin-bottom: 30px;
+            max-width: 600px;
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div id="startOverlay" class="overlay">
+            <h1>Жестовое рисование</h1>
+            <p>Это приложение использует камеру для распознавания жестов рук и рисования. Вам необходимо разрешить доступ к камере.</p>
+            <button id="startButton">Разрешить доступ к камере</button>
+        </div>
+        
         <video id="video" playsinline></video>
         <canvas id="drawingCanvas"></canvas>
         <canvas id="canvas"></canvas>
-        <div class="status" id="status">Waiting for camera access...</div>
+        <div class="status" id="status">Ожидание доступа к камере...</div>
         <div class="instructions">
             <p>1. Показать кулак и разжать дважды, затем указательный палец - для рисования</p>
             <p>2. Жест "OK" - для очистки экрана</p>
@@ -103,6 +151,8 @@
         const canvas = document.getElementById('canvas');
         const drawingCanvas = document.getElementById('drawingCanvas');
         const statusText = document.getElementById('status');
+        const startButton = document.getElementById('startButton');
+        const startOverlay = document.getElementById('startOverlay');
         const ctx = canvas.getContext('2d');
         const drawCtx = drawingCanvas.getContext('2d');
         
@@ -124,28 +174,38 @@
         
         let model = null;
         
+        // Add event listener to start button
+        startButton.addEventListener('click', () => {
+            // Hide the overlay
+            startOverlay.style.display = 'none';
+            // Initialize the application
+            initialize();
+        });
+        
         // Initialize the application
         function initialize() {
-            statusText.textContent = "Loading hand tracking model...";
+            statusText.textContent = "Загрузка модели распознавания рук...";
             
             // Load the hand tracking model
             handTrack.load(modelParams).then(loadedModel => {
                 model = loadedModel;
-                statusText.textContent = "Model loaded, requesting camera access...";
+                statusText.textContent = "Модель загружена, запрашиваем доступ к камере...";
                 
                 // Set canvas dimensions
                 setupCanvasDimensions();
                 
                 // Start video stream
                 startVideo();
+            }).catch(err => {
+                statusText.textContent = "Ошибка загрузки модели: " + err.message;
             });
         }
         
         // Setup canvas dimensions based on video
         function setupCanvasDimensions() {
             function updateDimensions() {
-                const containerWidth = video.clientWidth;
-                const containerHeight = video.clientHeight;
+                const containerWidth = video.clientWidth || 640;
+                const containerHeight = video.clientHeight || 480;
                 
                 canvas.width = containerWidth;
                 canvas.height = containerHeight;
@@ -178,19 +238,20 @@
                 video.onloadedmetadata = () => {
                     video.play()
                     .then(() => {
-                        statusText.textContent = "Tracking hands...";
+                        statusText.textContent = "Отслеживание рук...";
                         // Start hand detection
                         setInterval(() => {
                             detectHands();
                         }, 100);
                     })
                     .catch(err => {
-                        statusText.textContent = "Error playing video: " + err.message;
+                        statusText.textContent = "Ошибка воспроизведения видео: " + err.message;
                     });
                 };
             })
             .catch(err => {
-                statusText.textContent = "Error accessing camera: " + err.message;
+                statusText.textContent = "Ошибка доступа к камере: " + err.message;
+                startOverlay.style.display = 'flex';
             });
         }
         
@@ -211,7 +272,7 @@
                     requestAnimationFrame(() => {});
                 })
                 .catch(err => {
-                    console.error("Error detecting hands:", err);
+                    console.error("Ошибка распознавания рук:", err);
                 });
             }
         }
@@ -248,9 +309,9 @@
                     okDetected = true;
                     // Clear the drawing canvas
                     drawCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-                    statusText.textContent = "Canvas cleared!";
+                    statusText.textContent = "Холст очищен!";
                     setTimeout(() => {
-                        statusText.textContent = "Tracking hands...";
+                        statusText.textContent = "Отслеживание рук...";
                     }, 1500);
                 }
             } else {
@@ -275,7 +336,7 @@
                         isDrawing = true;
                         lastX = centerX;
                         lastY = centerY;
-                        statusText.textContent = "Drawing mode enabled!";
+                        statusText.textContent = "Режим рисования активирован!";
                     }
                     
                     // Draw line
@@ -311,9 +372,6 @@
             drawCtx.lineTo(x2, y2);
             drawCtx.stroke();
         }
-        
-        // Initialize the application when the page loads
-        window.addEventListener('load', initialize);
     </script>
 </body>
 </html>
