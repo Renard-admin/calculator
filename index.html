@@ -13,9 +13,9 @@
         #videoElement {
             width: 100%;
             height: auto;
-            max-height: 80vh; /* Ограничиваем максимальную высоту видео */
-            object-fit: cover; /* Ensure video covers the entire container */
-            display: block; /* Removes extra space below video */
+            max-height: 80vh;
+            object-fit: cover;
+            display: block;
         }
         canvas {
             position: absolute;
@@ -23,7 +23,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* Canvas не должен перехватывать события мыши */
+            pointer-events: none;
         }
         .drawing-active {
             cursor: crosshair;
@@ -34,17 +34,30 @@
         .visible {
             display: flex;
         }
+        .loader-spin {
+            border: 4px solid #3498db;
+            border-radius: 50%;
+            border-top: 4px solid transparent;
+            width: 48px;
+            height: 48px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.1/hands.js" crossorigin="anonymous"></script>
 </head>
-<body class="bg-gray-100 overflow-hidden"> <div class="relative w-full">
+<body class="bg-gray-100 overflow-hidden">
+    <div class="relative w-full">
         <video id="videoElement" class="w-full" autoplay muted></video>
         <canvas id="overlayCanvas" class="w-full h-full"></canvas>
     </div>
 
     <div id="loading" class="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-50 z-50">
-        <div class="loader-spin border-4 border-blue-500 rounded-full w-12 h-12 animate-spin"></div>
+        <div class="loader-spin"></div>
         <p class="ml-4 text-blue-500 text-lg font-semibold">Загрузка...</p>
     </div>
 
@@ -62,7 +75,7 @@
         let canvasContext = overlayCanvas.getContext('2d');
         let isDrawing = false;
         let previousX, previousY;
-        let drawingColor = 'black';  // Можно сделать выбор цвета
+        let drawingColor = 'black';
         let handPoseModel = null;
         let fingerCount = 0;
         let frameCounter = 0;
@@ -73,14 +86,12 @@
         const errorContainer = document.getElementById('error');
         const errorMessageDisplay = document.getElementById('errorMessage');
         const retryButton = document.getElementById('retryButton');
-        const gestureTimeout = 1000; //ms
+        const gestureTimeout = 1000;
         let timeoutId;
 
-        // MediaPipe HandLandmarker
         let handLandmarker = null;
         let runningMode = "VIDEO";
 
-        // Функция для инициализации MediaPipe HandLandmarker
         async function createHandLandmarker() {
             try {
                 const vision = await FilesetResolver.forVisionTasks(
@@ -96,7 +107,7 @@
                 });
                 loadingIndicator.classList.add('hidden');
                 errorContainer.classList.add('hidden');
-                startCamera(); // Запускаем камеру после успешной загрузки
+                startCamera();
             } catch (error) {
                 console.error("Failed to load hand landmark model:", error);
                 loadingIndicator.classList.add('hidden');
@@ -105,11 +116,12 @@
             }
         }
 
-        // Настройка canvas под размер видео
         function resizeCanvas() {
-            overlayCanvas.width = videoElement.videoWidth;
-            overlayCanvas.height = videoElement.videoHeight;
-            canvasRatio = overlayCanvas.width / overlayCanvas.height;
+            if (videoElement.videoWidth && videoElement.videoHeight) {
+                overlayCanvas.width = videoElement.videoWidth;
+                overlayCanvas.height = videoElement.videoHeight;
+                canvasRatio = overlayCanvas.width / overlayCanvas.height;
+            }
         }
 
         function clearCanvas() {
@@ -132,7 +144,7 @@
                     const x = handLandmark[i].x * overlayCanvas.width;
                     const y = handLandmark[i].y * overlayCanvas.height;
                     canvasContext.beginPath();
-                    canvasContext.arc(x, y, 5, 0, 2 * Math.PI);  // Рисуем круги на ключевых точках
+                    canvasContext.arc(x, y, 5, 0, 2 * Math.PI);
                     canvasContext.fill();
 
                     if (i > 0) {
@@ -152,9 +164,7 @@
 
             let handLandmark = landmarks[0];
             let openFingers = 0;
-            // Кончики пальцев
             const tipIds = [4, 8, 12, 16, 20];
-            // Основания пальцев
             const baseIds = [2, 6, 10, 14, 18];
 
             for (let i = 0; i < tipIds.length; i++) {
@@ -177,19 +187,15 @@
         }
 
         function handleHandResults(results) {
-            if (results.landmarks) {
+            if (results && results.landmarks && results.landmarks.length > 0) {
                 drawHandLandmarks(results.landmarks);
                 let currentFingerCount = countFingers(results.landmarks);
 
-                if (results.landmarks.length > 0) {
-                    detectedHandCount++;
-                } else {
-                    detectedHandCount = 0;
-                }
+                detectedHandCount = results.landmarks.length;
 
                 if (currentFingerCount !== fingerCount) {
                     fingerCount = currentFingerCount;
-                    frameCounter = 0; // Reset frame counter on finger count change
+                    frameCounter = 0;
                     if (timeoutId) {
                         clearTimeout(timeoutId);
                     }
@@ -197,8 +203,8 @@
                     frameCounter++;
                 }
 
-                if (detectedHandCount > 0 && fingerCount === 1 && frameCounter > 30) { // 30 frames ~ 1 second
-                    let indexFinger = results.landmarks[0][8];  // Index finger tip
+                if (detectedHandCount > 0 && fingerCount === 1 && frameCounter > 30) {
+                    let indexFinger = results.landmarks[0][8];
                     if (indexFinger) {
                         const x = indexFinger.x * overlayCanvas.width;
                         const y = indexFinger.y * overlayCanvas.height;
@@ -206,8 +212,8 @@
                             isDrawing = true;
                             previousX = x;
                             previousY = y;
-                            canvasContext.beginPath();  // Begin a new path when starting to draw
-                            canvasContext.moveTo(x, y);    // Move to the starting point
+                            canvasContext.beginPath();
+                            canvasContext.moveTo(x, y);
                         } else {
                             drawLine(previousX, previousY, x, y, drawingColor, 5);
                             previousX = x;
@@ -223,6 +229,11 @@
                         fingerCount = 0;
                         frameCounter = 0;
                     }, gestureTimeout);
+                }
+            } else {
+                detectedHandCount = 0;
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
                 }
             }
         }
@@ -272,11 +283,14 @@
         retryButton.addEventListener('click', () => {
             errorContainer.classList.add('hidden');
             loadingIndicator.classList.remove('hidden');
-            createHandLandmarker(); // Повторная попытка инициализации модели и камеры
+            createHandLandmarker();
         });
 
-        // Initialize everything
-        createHandLandmarker();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', createHandLandmarker);
+        } else {
+            createHandLandmarker();
+        }
     </script>
 </body>
 </html>
