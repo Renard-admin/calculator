@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Распознавание жестов рук и рисование</title>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #videoElement {
+            width: 100%;
+            height: auto;
+            max-height: 80vh; /* Ограничиваем максимальную высоту видео */
+            object-fit: cover; /* Ensure video covers the entire container */
+            display: block; /* Removes extra space below video */
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Canvas не должен перехватывать события мыши */
+        }
+        .drawing-active {
+            cursor: crosshair;
+        }
+        .hidden {
+            display: none;
+        }
+        .visible {
+            display: flex;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.1/hands.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-gray-100 overflow-hidden"> <div class="relative w-full">
+        <video id="videoElement" class="w-full" autoplay muted></video>
+        <canvas id="overlayCanvas" class="w-full h-full"></canvas>
+    </div>
+
+    <div id="loading" class="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-50 z-50">
+        <div class="loader-spin border-4 border-blue-500 rounded-full w-12 h-12 animate-spin"></div>
+        <p class="ml-4 text-blue-500 text-lg font-semibold">Загрузка...</p>
+    </div>
+
+    <div id="error" class="absolute inset-0 flex flex-col items-center justify-center bg-red-100 bg-opacity-75 z-50 hidden">
+        <h2 class="text-2xl font-semibold text-red-600 mb-4">Ошибка</h2>
+        <p id="errorMessage" class="text-red-500 text-center max-w-md"></p>
+        <button id="retryButton" class="mt-4 px-6 py-2 bg-blue-500 hover:bg-blue-700 text-white rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            Попробовать снова
+        </button>
+    </div>
+
+    <script>
+        let videoElement = document.getElementById('videoElement');
+        let overlayCanvas = document.getElementById('overlayCanvas');
+        let canvasContext = overlayCanvas.getContext('2d');
+        let isDrawing = false;
+        let previousX, previousY;
+        let drawingColor = 'black';  // Можно сделать выбор цвета
+        let handPoseModel = null;
+        let fingerCount = 0;
+        let frameCounter = 0;
+        let detectedHandCount = 0;
+        let canvasRatio = 1;
+
+        const loadingIndicator = document.getElementById('loading');
+        const errorContainer = document.getElementById('error');
+        const errorMessageDisplay = document.getElementById('errorMessage');
+        const retryButton = document.getElementById('retryButton');
+        const gestureTimeout = 1000; //ms
+        let timeoutId;
+
+        // MediaPipe HandLandmarker
+        let handLandmarker = null;
+        let runningMode = "VIDEO";
+
+        // Функция для инициализации MediaPipe HandLandmarker
+        async function createHandLandmarker() {
+            try {
+                const vision = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+                );
+                handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/hand_landmarker.task`,
+                        delegate: "GPU"
+                    },
+                    runningMode: runningMode,
+                    numHands: 1,
+                });
+                loadingIndicator.classList.add('hidden');
+                errorContainer.classList.add('hidden');
+                startCamera(); // Запускаем камеру после успешной загрузки
+            } catch (error) {
+                console.error("Failed to load hand landmark model:", error);
+                loadingIndicator.classList.add('hidden');
+                errorContainer.classList.remove('hidden');
+                errorMessageDisplay.textContent = "Failed to load hand landmark model. Please check your network connection.";
+            }
+        }
+
+        // Настройка canvas под размер видео
+        function resizeCanvas() {
+            overlayCanvas.width = videoElement.videoWidth;
+            overlayCanvas.height = videoElement.videoHeight;
+            canvasRatio = overlayCanvas.width / overlayCanvas.height;
+        }
+
+        function clearCanvas() {
+            canvasContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            isDrawing = false;
+            fingerCount = 0;
+            frameCounter = 0;
+            detectedHandCount = 0;
+        }
+
+        function drawHandLandmarks(landmarks) {
+            if (!landmarks || landmarks.length === 0) return;
+
+            canvasContext.fillStyle = 'red';
+            canvasContext.strokeStyle = 'limeGreen';
+            canvasContext.lineWidth = 3;
+
+            landmarks.forEach(handLandmark => {
+                for (let i = 0; i < handLandmark.length; i++) {
+                    const x = handLandmark[i].x * overlayCanvas.width;
+                    const y = handLandmark[i].y * overlayCanvas.height;
+                    canvasContext.beginPath();
+                    canvasContext.arc(x, y, 5, 0, 2 * Math.PI);  // Рисуем круги на ключевых точках
+                    canvasContext.fill();
+
+                    if (i > 0) {
+                        const prevX = handLandmark[i - 1].x * overlayCanvas.width;
+                        const prevY = handLandmark[i - 1].y * overlayCanvas.height;
+                        canvasContext.beginPath();
+                        canvasContext.moveTo(prevX, prevY);
+                        canvasContext.lineTo(x, y);
+                        canvasContext.stroke();
+                    }
+                }
+            });
+        }
+
+        function countFingers(landmarks) {
+            if (!landmarks || landmarks.length === 0) return 0;
+
+            let handLandmark = landmarks[0];
+            let openFingers = 0;
+            // Кончики пальцев
+            const tipIds = [4, 8, 12, 16, 20];
+            // Основания пальцев
+            const baseIds = [2, 6, 10, 14, 18];
+
+            for (let i = 0; i < tipIds.length; i++) {
+                const tip = handLandmark[tipIds[i]];
+                const base = handLandmark[baseIds[i]];
+                if (tip && base && tip.y < base.y) {
+                    openFingers++;
+                }
+            }
+            return openFingers;
+        }
+
+        function drawLine(x1, y1, x2, y2, color = 'black', width = 3) {
+            canvasContext.strokeStyle = color;
+            canvasContext.lineWidth = width;
+            canvasContext.beginPath();
+            canvasContext.moveTo(x1, y1);
+            canvasContext.lineTo(x2, y2);
+            canvasContext.stroke();
+        }
+
+        function handleHandResults(results) {
+            if (results.landmarks) {
+                drawHandLandmarks(results.landmarks);
+                let currentFingerCount = countFingers(results.landmarks);
+
+                if (results.landmarks.length > 0) {
+                    detectedHandCount++;
+                } else {
+                    detectedHandCount = 0;
+                }
+
+                if (currentFingerCount !== fingerCount) {
+                    fingerCount = currentFingerCount;
+                    frameCounter = 0; // Reset frame counter on finger count change
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                    }
+                } else {
+                    frameCounter++;
+                }
+
+                if (detectedHandCount > 0 && fingerCount === 1 && frameCounter > 30) { // 30 frames ~ 1 second
+                    let indexFinger = results.landmarks[0][8];  // Index finger tip
+                    if (indexFinger) {
+                        const x = indexFinger.x * overlayCanvas.width;
+                        const y = indexFinger.y * overlayCanvas.height;
+                        if (!isDrawing) {
+                            isDrawing = true;
+                            previousX = x;
+                            previousY = y;
+                            canvasContext.beginPath();  // Begin a new path when starting to draw
+                            canvasContext.moveTo(x, y);    // Move to the starting point
+                        } else {
+                            drawLine(previousX, previousY, x, y, drawingColor, 5);
+                            previousX = x;
+                            previousY = y;
+                        }
+                    }
+                }
+
+                if (detectedHandCount > 0 && fingerCount === 0 && frameCounter > 30) {
+                    timeoutId = setTimeout(() => {
+                        clearCanvas();
+                        isDrawing = false;
+                        fingerCount = 0;
+                        frameCounter = 0;
+                    }, gestureTimeout);
+                }
+            }
+        }
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                videoElement.srcObject = stream;
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    resizeCanvas();
+                    startDetection();
+                };
+            } catch (err) {
+                console.error("Error accessing the camera:", err);
+                errorContainer.classList.remove('hidden');
+                errorMessageDisplay.textContent = "Failed to access the camera. Please make sure you have a camera and allow access.";
+            }
+        }
+
+        async function startDetection() {
+            if (!handLandmarker) {
+                await createHandLandmarker();
+            }
+            if (handLandmarker) {
+                videoElement.addEventListener('timeupdate', () => {
+                    predictHandLandmarks();
+                });
+            }
+        }
+
+        async function predictHandLandmarks() {
+            if (!handLandmarker || !videoElement.videoWidth || !videoElement.videoHeight) {
+                return;
+            }
+            try {
+                const results = handLandmarker.detect(videoElement);
+                handleHandResults(results);
+            } catch (error) {
+                console.error("Error during hand landmark detection:", error);
+                errorContainer.classList.remove('hidden');
+                errorMessageDisplay.textContent = "Error during hand detection. Please reload the page.";
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
+        retryButton.addEventListener('click', () => {
+            errorContainer.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+            createHandLandmarker(); // Повторная попытка инициализации модели и камеры
+        });
+
+        // Initialize everything
+        createHandLandmarker();
+    </script>
+</body>
+</html>
