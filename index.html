@@ -81,22 +81,6 @@
             z-index: 20;
         }
         
-        #startButton {
-            padding: 15px 30px;
-            font-size: 18px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            z-index: 30;
-            margin-bottom: 20px;
-        }
-        
-        #startButton:hover {
-            background-color: #45a049;
-        }
-        
         .overlay {
             position: absolute;
             top: 0;
@@ -111,14 +95,15 @@
             z-index: 25;
             color: white;
             text-align: center;
+            padding: 20px;
         }
         
         .overlay h1 {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         
         .overlay p {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             max-width: 600px;
             line-height: 1.6;
         }
@@ -126,16 +111,15 @@
 </head>
 <body>
     <div class="container">
-        <div id="startOverlay" class="overlay">
-            <h1>Жестовое рисование</h1>
-            <p>Это приложение использует камеру для распознавания жестов рук и рисования. Вам необходимо разрешить доступ к камере.</p>
-            <button id="startButton">Разрешить доступ к камере</button>
+        <div id="errorOverlay" class="overlay" style="display: none;">
+            <h1>Ошибка доступа к камере</h1>
+            <p>Для работы приложения необходим доступ к камере. Пожалуйста, разрешите доступ к камере в настройках браузера и перезагрузите страницу.</p>
         </div>
         
         <video id="video" playsinline></video>
         <canvas id="drawingCanvas"></canvas>
         <canvas id="canvas"></canvas>
-        <div class="status" id="status">Ожидание доступа к камере...</div>
+        <div class="status" id="status">Запрос доступа к камере...</div>
         <div class="instructions">
             <p>1. Показать кулак и разжать дважды, затем указательный палец - для рисования</p>
             <p>2. Жест "OK" - для очистки экрана</p>
@@ -151,8 +135,7 @@
         const canvas = document.getElementById('canvas');
         const drawingCanvas = document.getElementById('drawingCanvas');
         const statusText = document.getElementById('status');
-        const startButton = document.getElementById('startButton');
-        const startOverlay = document.getElementById('startOverlay');
+        const errorOverlay = document.getElementById('errorOverlay');
         const ctx = canvas.getContext('2d');
         const drawCtx = drawingCanvas.getContext('2d');
         
@@ -174,11 +157,9 @@
         
         let model = null;
         
-        // Add event listener to start button
-        startButton.addEventListener('click', () => {
-            // Hide the overlay
-            startOverlay.style.display = 'none';
-            // Initialize the application
+        // Initialize the application when the page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            // Initialize the application immediately
             initialize();
         });
         
@@ -194,11 +175,18 @@
                 // Set canvas dimensions
                 setupCanvasDimensions();
                 
-                // Start video stream
+                // Start video stream immediately
                 startVideo();
             }).catch(err => {
                 statusText.textContent = "Ошибка загрузки модели: " + err.message;
+                showError("Не удалось загрузить модель распознавания рук. Пожалуйста, проверьте соединение с интернетом и перезагрузите страницу.");
             });
+        }
+        
+        // Show error message
+        function showError(message) {
+            errorOverlay.querySelector('p').textContent = message;
+            errorOverlay.style.display = 'flex';
         }
         
         // Setup canvas dimensions based on video
@@ -225,6 +213,7 @@
         
         // Start video stream
         function startVideo() {
+            // Автоматически запрашиваем доступ к камере при загрузке страницы
             navigator.mediaDevices.getUserMedia({
                 video: {
                     width: 1280,
@@ -246,12 +235,13 @@
                     })
                     .catch(err => {
                         statusText.textContent = "Ошибка воспроизведения видео: " + err.message;
+                        showError("Не удалось воспроизвести видео с камеры. Пожалуйста, проверьте настройки браузера и перезагрузите страницу.");
                     });
                 };
             })
             .catch(err => {
                 statusText.textContent = "Ошибка доступа к камере: " + err.message;
-                startOverlay.style.display = 'flex';
+                showError("Не удалось получить доступ к камере. Пожалуйста, разрешите доступ к камере в настройках браузера и перезагрузите страницу.");
             });
         }
         
