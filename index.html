@@ -1,339 +1,622 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Распознавание жестов и рисование</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Computer Vision Web App</title>
     <style>
-        body, html {
+        body {
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            overflow: hidden;
-            background: #333;
-            color: #fff;
-            font-family: sans-serif;
-        }
-        #container {
-            position: relative;
-            width: 100vw;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             height: 100vh;
-            background: #000;
         }
-        video, canvas {
+        .container {
+            position: relative;
+            margin: 20px auto;
+            width: 100%;
+            max-width: 800px;
+        }
+        #video-container {
+            position: relative;
+            width: 100%;
+            border: 1px solid #ccc;
+        }
+        #video {
+            width: 100%;
+            transform: scaleX(-1);
+            background-color: #000;
+        }
+        #canvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
             transform: scaleX(-1);
         }
-        #info {
+        #drawing-canvas {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.5);
-            padding: 5px 10px;
-            border-radius: 4px;
-            z-index: 10;
-            font-size: 14px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
         }
-        #controls {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 20;
+        .controls {
             display: flex;
+            justify-content: center;
+            margin-top: 15px;
             gap: 10px;
         }
-        #fullscreenBtn {
-            padding: 10px 20px;
-            background: rgba(0, 0, 0, 0.7);
-            color: #fff;
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             font-size: 16px;
         }
-        #fullscreenBtn:hover {
-            background: rgba(0, 0, 0, 0.9);
+        button:hover {
+            background-color: #45a049;
         }
-        #clearBtn {
-            padding: 10px 20px;
+        .status {
+            margin-top: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: rgba(0, 0, 0, 0.7);
-            color: #fff;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+            z-index: 1000;
         }
-        #clearBtn:hover {
-            background: rgba(0, 0, 0, 0.9);
+        .loading-content {
+            text-align: center;
         }
-        #colorPicker {
-            width: 40px;
-            height: 40px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            opacity: 0.7;
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto 20px;
         }
-        #colorPicker:hover {
-            opacity: 0.9;
-        }
-        .active-color {
-            border: 2px solid blue;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="output"></canvas>
-        <canvas id="drawLayer"></canvas>
-        <div id="info">Жесты: два раза сжать/разжать кулак + указательный = рисование; OK = очистить</div>
-        <div id="controls">
-            <button id="fullscreenBtn">Полный экран</button>
-            <button id="clearBtn">Очистить</button>
-            <input type="color" id="colorPicker" value="#000000" class="active-color">
+    <div class="loading" id="loading">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Loading models...</p>
+            <div id="loading-progress">0%</div>
         </div>
     </div>
+    
+    <h1>Computer Vision Web App</h1>
+    
+    <div class="container">
+        <div id="video-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+            <canvas id="drawing-canvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button id="fullscreen-btn">Fullscreen</button>
+            <button id="switch-camera-btn">Switch Camera</button>
+            <button id="clear-drawing-btn">Clear Drawing</button>
+        </div>
+        
+        <div class="status" id="status">Waiting for camera permission...</div>
+    </div>
+
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/3.18.0/tf.min.js"></script>
+    
+    <!-- Load MediaPipe Hands -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    
+    <!-- Load face-api.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js"></script>
+    
+    <!-- Load COCO-SSD model -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+    
     <script>
-        // Элементы страницы
-        const videoElement = document.getElementById('video');
-        const outputCanvas = document.getElementById('output');
-        const drawCanvas = document.getElementById('drawLayer');
-        const infoDiv = document.getElementById('info');
-        const fullscreenBtn = document.getElementById('fullscreenBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const colorPicker = document.getElementById('colorPicker');
-        const outputCtx = outputCanvas.getContext('2d');
-        const drawCtx = drawCanvas.getContext('2d');
-
-        // Функция перехода в полноэкранный режим
-        fullscreenBtn.addEventListener('click', () => {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            } else {
-                document.getElementById('container').requestFullscreen();
-            }
-        });
-
-        // Функция очистки холста
-        clearBtn.addEventListener('click', () => {
-            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-            isDrawing = false;
-            fistCount = 0;
-            gestureActive = false;
-        });
-
-        // Функция изменения цвета рисования
-        colorPicker.addEventListener('change', (event) => {
-            drawingColor = event.target.value;
-            colorPicker.classList.remove('active-color');
-            setTimeout(()=> {
-                colorPicker.classList.add('active-color');
-            }, 100)
-
-        });
-
-        // Изменяем размеры canvas под размер окна
-        function resizeCanvases() {
-            outputCanvas.width = videoElement.videoWidth || window.innerWidth;
-            outputCanvas.height = videoElement.videoHeight || window.innerHeight;
-            drawCanvas.width = outputCanvas.width;
-            drawCanvas.height = outputCanvas.height;
-        }
-
-        // Переменные для управления состояниями жестов
-        let fistCount = 0;
-        let gestureActive = false;
-        let lastFistState = false;
-        let lastTimeFist = 0;
+        // Global variables
+        let video, canvas, ctx, drawingCanvas, drawingCtx;
+        let handModel, faceModel, objectModel;
+        let currentStream;
+        let isFrontCamera = true;
+        let isDrawingMode = false;
+        let lastHandGesture = '';
+        let gestureHistory = [];
         let isDrawing = false;
-        let previousX, previousY;
-        let drawingColor = '#000000'; // Цвет рисования по умолчанию
-
-        // Функции для определения "сжатости" пальцев.
-        function isFingerExtended(landmarks, pipIdx, tipIdx) {
-            const pip = landmarks[pipIdx];
-            const tip = landmarks[tipIdx];
-            const wrist = landmarks[0];
-            const distTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
-            const distPip = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
-            return distTip > distPip * 1.3;
-        }
-
-        // Проверка жеста "кулак" – все пальцы не вытянуты
-        function isFist(landmarks) {
-            const fingers = [
-                { pip: 6, tip: 8 },
-                { pip: 10, tip: 12 },
-                { pip: 14, tip: 16 },
-                { pip: 18, tip: 20 }
-            ];
-            let thumbExtended = isFingerExtended(landmarks, 2, 4);
-            let otherFingersFolded = fingers.every(f => !isFingerExtended(landmarks, f.pip, f.tip));
-            return (!thumbExtended) && otherFingersFolded;
-        }
-
-        // Проверка жеста "указательный" – указательный палец вытянут, остальные нет
-        function isIndexPointing(landmarks) {
-            const indexExtended = isFingerExtended(landmarks, 6, 8);
-            const otherFingers = [
-                { pip: 10, tip: 12 },
-                { pip: 14, tip: 16 },
-                { pip: 18, tip: 20 }
-            ];
-            let othersFolded = otherFingers.every(f => !isFingerExtended(landmarks, f.pip, f.tip));
-            return indexExtended && othersFolded;
-        }
-
-        // Проверка жеста OK – расстояние между большим и указательным пальцами маленькое
-        function isOkGesture(landmarks) {
-            const thumbTip = landmarks[4];
-            const indexTip = landmarks[8];
-            const dx = thumbTip.x - indexTip.x;
-            const dy = thumbTip.y - indexTip.y;
-            const dist = Math.hypot(dx, dy);
-            return dist < 0.05;
-        }
-
-        // Функция рисования
-        function draw(x, y) {
-            drawCtx.fillStyle = drawingColor;
-            drawCtx.beginPath();
-            drawCtx.arc(x, y, 4, 0, 2 * Math.PI);
-            drawCtx.fill();
-            if (isDrawing) {
-                drawCtx.strokeStyle = drawingColor;
-                drawCtx.lineWidth = 3;
-                drawCtx.beginPath();
-                drawCtx.moveTo(previousX, previousY);
-                drawCtx.lineTo(x, y);
-                drawCtx.stroke();
-            }
-            previousX = x;
-            previousY = y;
-            isDrawing = true;
-        }
-
-        // Инициализация Mediapipe Hands и Camera
+        let lastX = 0, lastY = 0;
+        let modelsLoaded = 0;
+        const totalModelsToLoad = 4; // Hands, Face Detector, Face Expression, COCO-SSD
+        
+        // Lists for object classification
+        const dangerousObjects = ['knife', 'scissors', 'cell phone', 'remote', 'fork', 'toothbrush'];
+        const foodObjects = ['apple', 'banana', 'orange', 'pizza', 'hot dog', 'carrot', 'cake', 'sandwich', 'broccoli'];
+        
+        // Initialize the application
         async function init() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            drawingCanvas = document.getElementById('drawing-canvas');
+            drawingCtx = drawingCanvas.getContext('2d');
+            
+            // Set up button listeners
+            document.getElementById('fullscreen-btn').addEventListener('click', toggleFullscreen);
+            document.getElementById('switch-camera-btn').addEventListener('click', switchCamera);
+            document.getElementById('clear-drawing-btn').addEventListener('click', clearDrawing);
+            
+            // Load all models in parallel
+            await Promise.all([
+                loadHandModel(),
+                loadFaceModels(),
+                loadObjectModel()
+            ]);
+            
+            // Request camera access
+            await setupCamera();
+            
+            // Start detection loop
+            detectLoop();
+        }
+        
+        // Load MediaPipe Hands model
+        async function loadHandModel() {
+            updateStatus("Loading hand model...");
             try {
-                // Запрашиваем доступ к камере
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                videoElement.srcObject = stream;
-                videoElement.onloadedmetadata = () => {
-                    videoElement.play();
-                    resizeCanvases();
-                };
-
-                // Инициализация Mediapipe Hands
                 const hands = new Hands({
                     locateFile: (file) => {
                         return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
                     }
                 });
+                
                 hands.setOptions({
-                    maxNumHands: 1,
+                    maxNumHands: 2,
                     modelComplexity: 1,
-                    minDetectionConfidence: 0.7,
-                    minTrackingConfidence: 0.7
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
                 });
-
-                // Обработка результатов от Mediapipe
-                hands.onResults((results) => {
-                    // Обновляем размеры canvas при получении первых данных
-                    if (!outputCanvas.width || !outputCanvas.height) {
-                        resizeCanvases();
-                    }
-
-                    // Отрисовываем видео-кадр на основном canvas
-                    outputCtx.save();
-                    outputCtx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
-                    outputCtx.drawImage(results.image, 0, 0, outputCanvas.width, outputCanvas.height);
-
-                    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                        const landmarks = results.multiHandLandmarks[0];
-
-                        // Вычисляем ограничивающий прямоугольник для руки
-                        let minX = 1, minY = 1, maxX = 0, maxY = 0;
-                        landmarks.forEach(pt => {
-                            if (pt.x < minX) minX = pt.x;
-                            if (pt.y < minY) minY = pt.y;
-                            if (pt.x > maxX) maxX = pt.x;
-                            if (pt.y > maxY) maxY = pt.y;
-                        });
-                        const boxX = minX * outputCanvas.width;
-                        const boxY = minY * outputCanvas.height;
-                        const boxW = (maxX - minX) * outputCanvas.width;
-                        const boxH = (maxY - minY) * outputCanvas.height;
-                        outputCtx.strokeStyle = 'lime';
-                        outputCtx.lineWidth = 3;
-                        outputCtx.strokeRect(boxX, boxY, boxW, boxH);
-
-                        // Логика распознавания жестов
-                        const now = Date.now();
-                        if (now - lastTimeFist > 700) {
-                            const fist = isFist(landmarks);
-                            if (fist !== lastFistState) {
-                                lastFistState = fist;
-                                lastTimeFist = now;
-                                if (fist) {
-                                    fistCount++;
-                                    console.log("Кулак обнаружен. Счёт:", fistCount);
-                                }
-                            }
-                        }
-                        if (!gestureActive && fistCount >= 2 && isIndexPointing(landmarks)) {
-                            gestureActive = true;
-                            isDrawing = false;
-                            console.log("Режим рисования активирован");
-                            infoDiv.textContent = "Режим рисования: активен. Жест OK для очистки.";
-                        }
-                        if (gestureActive) {
-                            const indexTip = landmarks[8];
-                            const x = indexTip.x * drawCanvas.width;
-                            const y = indexTip.y * drawCanvas.height;
-                            draw(x, y);
-                        }
-                        if (gestureActive && isOkGesture(landmarks)) {
-                            console.log("Жест OK обнаружен, очистка холста");
-                            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-                            gestureActive = false;
-                            fistCount = 0;
-                            isDrawing = false;
-                            infoDiv.textContent = "Жесты: два раза сжать/разжать кулак + указательный = рисование; OK = очистить";
-                        }
-                    }
-                    outputCtx.restore();
-                });
-
-                // Инициализация камеры через утилиты Mediapipe
-                const camera = new Camera(videoElement, {
-                    onFrame: async () => {
-                        await hands.send({ image: videoElement });
-                    },
-                    width: 640,
-                    height: 480
-                });
-                camera.start();
-
-                // При изменении размера окна – обновляем размеры canvas
-                window.addEventListener('resize', resizeCanvases);
-
+                
+                hands.onResults(onHandResults);
+                
+                handModel = hands;
+                modelsLoaded++;
+                updateLoadingProgress();
+                updateStatus("Hand model loaded");
+                return hands;
             } catch (error) {
-                console.error("Ошибка при инициализации:", error);
-                alert("Не удалось получить доступ к камере. Пожалуйста, убедитесь, что камера подключена и разрешен доступ.");
+                console.error("Error loading hand model:", error);
+                updateStatus("Failed to load hand model");
             }
         }
-
-        // Вызываем функцию инициализации
-        init();
+        
+        // Load face-api.js models
+        async function loadFaceModels() {
+            updateStatus("Loading face models...");
+            try {
+                await faceapi.nets.tinyFaceDetector.load('https://cdn.jsdelivr.net/npm/face-api.js/models/');
+                modelsLoaded++;
+                updateLoadingProgress();
+                
+                await faceapi.nets.ageGenderNet.load('https://cdn.jsdelivr.net/npm/face-api.js/models/');
+                modelsLoaded++;
+                updateLoadingProgress();
+                
+                await faceapi.nets.faceExpressionNet.load('https://cdn.jsdelivr.net/npm/face-api.js/models/');
+                modelsLoaded++;
+                updateLoadingProgress();
+                
+                updateStatus("Face models loaded");
+                return true;
+            } catch (error) {
+                console.error("Error loading face models:", error);
+                updateStatus("Failed to load face models");
+            }
+        }
+        
+        // Load COCO-SSD model
+        async function loadObjectModel() {
+            updateStatus("Loading object detection model...");
+            try {
+                objectModel = await cocoSsd.load();
+                modelsLoaded++;
+                updateLoadingProgress();
+                updateStatus("Object detection model loaded");
+                return objectModel;
+            } catch (error) {
+                console.error("Error loading object model:", error);
+                updateStatus("Failed to load object model");
+            }
+        }
+        
+        // Update loading progress
+        function updateLoadingProgress() {
+            const percentage = Math.round((modelsLoaded / totalModelsToLoad) * 100);
+            document.getElementById('loading-progress').textContent = `${percentage}%`;
+            
+            if (modelsLoaded >= totalModelsToLoad) {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        // Set up camera
+        async function setupCamera() {
+            updateStatus("Requesting camera permission...");
+            
+            const constraints = {
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: isFrontCamera ? "user" : "environment"
+                }
+            };
+            
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = currentStream;
+                
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        drawingCanvas.width = video.videoWidth;
+                        drawingCanvas.height = video.videoHeight;
+                        updateStatus("Camera connected");
+                        resolve(video);
+                    };
+                });
+            } catch (error) {
+                console.error("Error accessing the camera:", error);
+                updateStatus("Failed to access camera");
+            }
+        }
+        
+        // Switch between front and back camera
+        async function switchCamera() {
+            if (currentStream) {
+                // Stop all tracks
+                currentStream.getTracks().forEach(track => {
+                    track.stop();
+                });
+                
+                // Toggle camera
+                isFrontCamera = !isFrontCamera;
+                
+                // Set up camera again
+                await setupCamera();
+            }
+        }
+        
+        // Toggle fullscreen mode
+        function toggleFullscreen() {
+            const container = document.getElementById('video-container');
+            
+            if (!document.fullscreenElement) {
+                if (container.requestFullscreen) {
+                    container.requestFullscreen();
+                } else if (container.webkitRequestFullscreen) {
+                    container.webkitRequestFullscreen();
+                } else if (container.msRequestFullscreen) {
+                    container.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+            }
+        }
+        
+        // Clear drawing canvas
+        function clearDrawing() {
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        }
+        
+        // Handler for hand detection results
+        function onHandResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const hand = results.multiHandLandmarks[0];
+                
+                // Draw hand landmarks
+                drawHand(hand);
+                
+                // Detect gestures
+                const gesture = detectGesture(hand);
+                
+                // Update gesture history
+                updateGestureHistory(gesture);
+                
+                // Handle drawing based on gestures
+                handleDrawing(hand);
+            }
+        }
+        
+        // Update gesture history
+        function updateGestureHistory(gesture) {
+            if (gesture !== lastHandGesture) {
+                gestureHistory.push(gesture);
+                if (gestureHistory.length > 5) {
+                    gestureHistory.shift();
+                }
+                lastHandGesture = gesture;
+                
+                // Check for drawing activation sequence: fist, fist, pointer
+                const recentGestures = gestureHistory.slice(-3);
+                if (
+                    recentGestures.length === 3 &&
+                    recentGestures[0] === 'fist' &&
+                    recentGestures[1] === 'fist' &&
+                    recentGestures[2] === 'pointer'
+                ) {
+                    isDrawingMode = true;
+                    updateStatus("Drawing mode activated");
+                }
+                
+                // Check for OK gesture to clear drawing
+                if (gesture === 'ok') {
+                    clearDrawing();
+                    updateStatus("Drawing cleared");
+                }
+            }
+        }
+        
+        // Detect hand gesture
+        function detectGesture(landmarks) {
+            // Extract important landmarks
+            const thumbTip = landmarks[4];
+            const indexTip = landmarks[8];
+            const middleTip = landmarks[12];
+            const ringTip = landmarks[16];
+            const pinkyTip = landmarks[20];
+            const wrist = landmarks[0];
+            
+            // Calculate distances for gesture detection
+            const thumbToIndexDistance = calculateDistance(thumbTip, indexTip);
+            
+            // Average fingertip height relative to wrist
+            const fingerTipsAvgY = (indexTip.y + middleTip.y + ringTip.y + pinkyTip.y) / 4;
+            const wristY = wrist.y;
+            
+            // Check for "OK" gesture (thumb and index finger close together)
+            if (thumbToIndexDistance < 0.05) {
+                return 'ok';
+            }
+            
+            // Check for fist (all fingers curled)
+            if (fingerTipsAvgY > wristY - 0.1) {
+                return 'fist';
+            }
+            
+            // Check for pointer (only index finger extended)
+            if (
+                indexTip.y < wristY - 0.1 &&
+                middleTip.y > wristY - 0.1 &&
+                ringTip.y > wristY - 0.1 &&
+                pinkyTip.y > wristY - 0.1
+            ) {
+                return 'pointer';
+            }
+            
+            // Default gesture
+            return 'other';
+        }
+        
+        // Calculate distance between two landmarks
+        function calculateDistance(a, b) {
+            return Math.sqrt(
+                Math.pow(a.x - b.x, 2) +
+                Math.pow(a.y - b.y, 2) +
+                Math.pow(a.z - b.z, 2)
+            );
+        }
+        
+        // Handle drawing based on gestures
+        function handleDrawing(landmarks) {
+            if (isDrawingMode && lastHandGesture === 'pointer') {
+                // Get index finger position
+                const indexTip = landmarks[8];
+                
+                // Convert normalized coordinates to canvas coordinates
+                const x = Math.floor(indexTip.x * drawingCanvas.width);
+                const y = Math.floor(indexTip.y * drawingCanvas.height);
+                
+                if (!isDrawing) {
+                    // Start a new line
+                    isDrawing = true;
+                    lastX = x;
+                    lastY = y;
+                } else {
+                    // Continue the line
+                    drawingCtx.beginPath();
+                    drawingCtx.moveTo(lastX, lastY);
+                    drawingCtx.lineTo(x, y);
+                    drawingCtx.strokeStyle = 'black';
+                    drawingCtx.lineWidth = 4;
+                    drawingCtx.stroke();
+                    
+                    lastX = x;
+                    lastY = y;
+                }
+            } else {
+                isDrawing = false;
+            }
+        }
+        
+        // Draw hand landmarks
+        function drawHand(landmarks) {
+            // Find bounding box
+            let minX = 1, minY = 1, maxX = 0, maxY = 0;
+            for (const landmark of landmarks) {
+                minX = Math.min(minX, landmark.x);
+                minY = Math.min(minY, landmark.y);
+                maxX = Math.max(maxX, landmark.x);
+                maxY = Math.max(maxY, landmark.y);
+            }
+            
+            // Draw bounding box
+            ctx.strokeStyle = 'green';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+                minX * canvas.width,
+                minY * canvas.height,
+                (maxX - minX) * canvas.width,
+                (maxY - minY) * canvas.height
+            );
+        }
+        
+        // Detect faces using face-api.js
+        async function detectFaces() {
+            if (!video.paused && !video.ended && faceapi && video.readyState === 4) {
+                try {
+                    const detectionOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+                    const results = await faceapi.detectAllFaces(video, detectionOptions)
+                        .withAgeAndGender()
+                        .withFaceExpressions();
+                    
+                    if (results && results.length > 0) {
+                        // Draw face detections
+                        results.forEach(detection => {
+                            // Extract information
+                            const box = detection.detection.box;
+                            const age = Math.round(detection.age);
+                            const expressions = detection.expressions;
+                            
+                            // Find dominant expression
+                            let dominantExpression = Object.keys(expressions).reduce((a, b) => 
+                                expressions[a] > expressions[b] ? a : b
+                            );
+                            
+                            // Format expression name
+                            dominantExpression = dominantExpression.charAt(0).toUpperCase() + dominantExpression.slice(1);
+                            
+                            // Draw box around face
+                            ctx.strokeStyle = 'yellow';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(box.x, box.y, box.width, box.height);
+                            
+                            // Draw text background
+                            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                            ctx.fillRect(box.x, box.y - 35, box.width, 35);
+                            
+                            // Draw text
+                            ctx.fillStyle = 'white';
+                            ctx.font = '16px Arial';
+                            ctx.fillText(`Age: ~${age}, Mood: ${dominantExpression}`, box.x + 5, box.y - 10);
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error detecting faces:", error);
+                }
+            }
+        }
+        
+        // Detect objects using COCO-SSD
+        async function detectObjects() {
+            if (!video.paused && !video.ended && objectModel && video.readyState === 4) {
+                try {
+                    const predictions = await objectModel.detect(video);
+                    
+                    if (predictions && predictions.length > 0) {
+                        // Draw object detections
+                        predictions.forEach(prediction => {
+                            const [x, y, width, height] = prediction.bbox;
+                            const label = prediction.class;
+                            
+                            // Determine object category and color
+                            let color, category;
+                            if (dangerousObjects.includes(label.toLowerCase())) {
+                                color = 'red';
+                                category = 'Dangerous';
+                            } else if (foodObjects.includes(label.toLowerCase())) {
+                                color = 'green';
+                                category = 'Food';
+                            } else {
+                                color = 'yellow';
+                                category = '';
+                            }
+                            
+                            // Draw box around object
+                            ctx.strokeStyle = color;
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(x, y, width, height);
+                            
+                            // Draw text background
+                            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                            ctx.fillRect(x, y - 25, width, 25);
+                            
+                            // Draw text
+                            ctx.fillStyle = 'white';
+                            ctx.font = '16px Arial';
+                            const displayLabel = category ? `${category}: ${label}` : label;
+                            ctx.fillText(displayLabel, x + 5, y - 5);
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error detecting objects:", error);
+                }
+            }
+        }
+        
+        // Main detection loop
+        async function detectLoop() {
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Process frame with MediaPipe Hands
+            if (handModel && video.readyState === 4) {
+                try {
+                    await handModel.send({image: video});
+                } catch (error) {
+                    console.error("Error processing hand detection:", error);
+                }
+            }
+            
+            // Detect faces
+            await detectFaces();
+            
+            // Detect objects
+            await detectObjects();
+            
+            // Continue the detection loop
+            requestAnimationFrame(detectLoop);
+        }
+        
+        // Update status message
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+        
+        // Start the application when the page loads
+        window.addEventListener('load', init);
     </script>
 </body>
 </html>
