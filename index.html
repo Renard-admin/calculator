@@ -1,495 +1,182 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Полезный портал</title>
-  <!-- Подключаем футуристический шрифт (Orbitron) -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap"/>
+  <meta charset="UTF-8">
+  <title>Лазерное рисование</title>
   <style>
-    /* ====== СТИЛИ ====== */
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
+    /* Сброс отступов и настройка размеров */
+    html, body {
       margin: 0;
       padding: 0;
-      background-color: #000000;
-      color: #e1d9ce;
-      font-family: 'Orbitron', Arial, sans-serif;
-    }
-
-    h1, h2, h3 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    p, ul, ol, section {
-      margin-bottom: 20px;
-      line-height: 1.6;
-    }
-
-    /* Контейнер главного меню */
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-      text-align: center;
-    }
-
-    /* Сетка кнопок главного меню */
-    .buttons-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 20px;
-      margin-top: 20px;
-      justify-items: center;
-    }
-
-    /* Кнопки – фиксированный размер, одинаковые для всех */
-    .main-btn, .nav-btn {
-      width: 180px;
-      height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      color: #000000;
-      background-color: #e1d9ce;
-      border-radius: 20px;
-      font-weight: bold;
-      letter-spacing: 1px;
-      cursor: pointer;
-      /* Эффект свечения (glow) */
-      box-shadow: 0 0 10px #e1d9ce;
-      transition: transform 0.2s, box-shadow 0.2s;
-      margin-bottom: 10px;
-    }
-
-    .main-btn:hover, .nav-btn:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 20px #e1d9ce;
-    }
-
-    /* Кнопка "назад" */
-    .back-link {
-      display: inline-block;
-      margin-top: 20px;
-      color: #e1d9ce;
-      text-decoration: none;
-      font-size: 1rem;
-      border: 1px solid #e1d9ce;
-      padding: 8px 16px;
-      border-radius: 8px;
-      transition: background-color 0.3s, color 0.3s;
-      cursor: pointer;
-    }
-    .back-link:hover {
-      background-color: #e1d9ce;
-      color: #000000;
-    }
-
-    /* Видео контейнер */
-    .video-container {
-      position: relative;
-      padding-bottom: 56.25%;
-      height: 0;
       overflow: hidden;
-      margin: 20px 0;
-    }
-    .video-container iframe {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
+      background: #000;
       height: 100%;
-      border: none;
     }
-
-    /* Pomodoro таймер */
-    .pomodoro-timer {
-      text-align: center;
-      margin: 40px 0;
-    }
-    #timer-display {
-      font-size: 3rem;
-      margin-bottom: 20px;
-    }
-    #start-btn, #pause-btn, #reset-btn {
-      margin: 0 10px;
-    }
-
-    /* Секции – оверлей на весь экран */
-    .page-section {
-      display: none;
+    /* Видео занимает весь экран */
+    #video {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      overflow-y: auto;
-      background-color: #000000;
-      padding: 20px;
-      z-index: 10;
-      animation: fadeIn 0.5s ease;
+      object-fit: cover;
+      z-index: 1;
     }
-
-    @keyframes fadeIn {
-      from {opacity: 0;}
-      to {opacity: 1;}
+    /* Canvas для рисования поверх видео */
+    #drawingCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 2;
     }
-
-    /* Адаптивность */
-    @media (max-width: 600px) {
-      .buttons-grid {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      }
-      .main-btn, .nav-btn {
-        width: 150px;
-        height: 45px;
-        font-size: 0.9rem;
-      }
+    /* Кнопка выбора цвета в правом верхнем углу */
+    #colorPickerButton {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 3;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    /* Скрытый input для выбора цвета */
+    #colorPicker {
+      display: none;
     }
   </style>
 </head>
 <body>
+  <!-- Видео с камеры -->
+  <video id="video" autoplay playsinline></video>
+  <!-- Canvas для рисования -->
+  <canvas id="drawingCanvas"></canvas>
+  <!-- Кнопка выбора цвета -->
+  <button id="colorPickerButton">Цвет линии</button>
+  <input type="color" id="colorPicker">
 
-  <!-- Главное меню -->
-  <div class="container" id="main-menu">
-    <h1>Полезный портал</h1>
-    <div class="buttons-grid">
-      <button class="main-btn" onclick="showSection('books')">КНИГИ</button>
-      <button class="main-btn" onclick="showSection('antidroch')">АНТИДРОЧ</button>
-      <button class="main-btn" onclick="showSection('sugar')">САХАР</button>
-      <button class="main-btn" onclick="showSection('lessons')">УРОКИ</button>
-      <button class="main-btn" onclick="showSection('skills')">НАВЫКИ</button>
-      <button class="main-btn" onclick="showSection('movies')">ФИЛЬМЫ</button>
-      <button class="main-btn" onclick="showSection('meaning')">ЗАЧЕМ ЖИТЬ</button>
-      <button class="main-btn" onclick="showSection('pomodoro')">МЕТОД ПОМИДОРА</button>
-      <button class="main-btn" onclick="showSection('lofi')">LOFI</button>
-      <button class="main-btn" onclick="showSection('telegram')">TELEGRAM</button>
-      <button class="main-btn" onclick="showSection('prof')">ПРОФ ОРИЕНТАЦИЯ</button>
-      <button class="main-btn" onclick="showSection('github')">---</button>
-    </div>
-  </div>
-
-  <!-- Секции (отдельные страницы) -->
-
-  <!-- 1. КНИГИ -->
-  <section id="books" class="page-section">
-    <h2>Книги</h2>
-    <p>Здесь вы можете открыть PDF-файлы с рекомендованными книгами.</p>
-    <div class="buttons-grid">
-      <a href="pdf/kniga1.pdf" target="_blank" class="main-btn">Книга 1</a>
-      <a href="pdf/kniga2.pdf" target="_blank" class="main-btn">Книга 2</a>
-      <a href="pdf/kniga3.pdf" target="_blank" class="main-btn">Книга 3</a>
-    </div>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 2. АНТИДРОЧ -->
-  <section id="antidroch" class="page-section">
-    <h2>Антидроч</h2>
-    <p>Информация о вреде мастурбации и преимуществах отказа от неё.</p>
-    <h3>100 пунктов, как изменится жизнь без мастурбации:</h3>
-    <ol>
-      <li>Повышение уровня энергии</li>
-      <li>Улучшение концентрации</li>
-      <li>Снижение чувства вины</li>
-      <li>…</li>
-    </ol>
-    <h3>Видео на эту тему:</h3>
-    <ul>
-      <li><a href="https://www.youtube.com/results?search_query=no+fap" target="_blank">Видео #1</a></li>
-      <li><a href="https://www.youtube.com/results?search_query=no+fap+benefits" target="_blank">Видео #2</a></li>
-    </ul>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 3. САХАР -->
-  <section id="sugar" class="page-section">
-    <h2>Вред сахара</h2>
-    <p>
-      Сахар может негативно влиять на здоровье, повышая риск ожирения, диабета и проблем с сердцем.
-    </p>
-    <h3>Полезные видео:</h3>
-    <ul>
-      <li><a href="https://www.youtube.com/results?search_query=вред+сахара" target="_blank">Видео о вреде сахара #1</a></li>
-      <li><a href="https://www.youtube.com/results?search_query=сахар+здоровье" target="_blank">Видео о влиянии сахара #2</a></li>
-    </ul>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 4. УРОКИ -->
-  <section id="lessons" class="page-section">
-    <h2>Уроки</h2>
-    <p>Выберите предмет:</p>
-    <div class="buttons-grid">
-      <button class="nav-btn" onclick="scrollToId('english')">Английский</button>
-      <button class="nav-btn" onclick="scrollToId('math')">Математика</button>
-      <button class="nav-btn" onclick="scrollToId('informatics')">Информатика</button>
-    </div>
-    <section id="english">
-      <h3>Английский</h3>
-      <ul>
-        <li><a href="https://www.youtube.com/results?search_query=english+lessons" target="_blank">YouTube-уроки</a></li>
-        <li><a href="https://www.duolingo.com/" target="_blank">Duolingo</a></li>
-        <li><a href="#" target="_blank">Другие ресурсы</a></li>
-      </ul>
-    </section>
-    <section id="math">
-      <h3>Математика</h3>
-      <ul>
-        <li><a href="https://www.youtube.com/results?search_query=math+tutorials" target="_blank">YouTube-уроки</a></li>
-        <li><a href="#" target="_blank">Обучающие сайты</a></li>
-      </ul>
-    </section>
-    <section id="informatics">
-      <h3>Информатика</h3>
-      <ul>
-        <li><a href="https://www.youtube.com/results?search_query=computer+science+tutorials" target="_blank">YouTube-уроки</a></li>
-        <li><a href="#" target="_blank">Сайты по программированию</a></li>
-      </ul>
-    </section>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 5. НАВЫКИ -->
-  <section id="skills" class="page-section">
-    <h2>Навыки</h2>
-    <p>Выберите навык для изучения:</p>
-    <div class="buttons-grid">
-      <button class="nav-btn" onclick="scrollToId('skill1')">Навык 1</button>
-      <button class="nav-btn" onclick="scrollToId('skill2')">Навык 2</button>
-      <button class="nav-btn" onclick="scrollToId('skill3')">Навык 3</button>
-    </div>
-    <section id="skill1">
-      <h3>Навык 1</h3>
-      <p>Описание навыка 1. Чем полезен, как изучать.</p>
-      <ul>
-        <li><a href="https://www.youtube.com/" target="_blank">Видео-урок на YouTube</a></li>
-        <li><a href="#" target="_blank">Статья или учебник</a></li>
-      </ul>
-    </section>
-    <section id="skill2">
-      <h3>Навык 2</h3>
-      <p>Описание навыка 2. Чем полезен, как изучать.</p>
-      <ul>
-        <li><a href="https://www.youtube.com/" target="_blank">Видео-урок на YouTube</a></li>
-        <li><a href="#" target="_blank">Статья или учебник</a></li>
-      </ul>
-    </section>
-    <section id="skill3">
-      <h3>Навык 3</h3>
-      <p>Описание навыка 3. Чем полезен, как изучать.</p>
-      <ul>
-        <li><a href="https://www.youtube.com/" target="_blank">Видео-урок на YouTube</a></li>
-        <li><a href="#" target="_blank">Статья или учебник</a></li>
-      </ul>
-    </section>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 6. ФИЛЬМЫ -->
-  <section id="movies" class="page-section">
-    <h2>Фильмы</h2>
-    <p>Небольшой список фильмов с описанием и идеями, которым они могут научить.</p>
-    <ul>
-      <li><strong>Фильм 1</strong> — краткое описание, главная идея, чему учит.</li>
-      <li><strong>Фильм 2</strong> — краткое описание, главная идея, чему учит.</li>
-      <li><strong>Фильм 3</strong> — краткое описание, главная идея, чему учит.</li>
-    </ul>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 7. ЗАЧЕМ ЖИТЬ -->
-  <section id="meaning" class="page-section">
-    <h2>Зачем жить</h2>
-    <p>Тексты и видеоролики, которые помогают разобраться в вопросах смысла жизни, личностного роста, саморазвития.</p>
-    <h3>Видео по теме</h3>
-    <div class="video-container">
-      <iframe 
-        src="https://www.youtube.com/embed/VIDEO_ID" 
-        title="Видео о смысле жизни"
-        frameborder="0"
-        allowfullscreen>
-      </iframe>
-    </div>
-    <p>Также вы можете почитать статьи на тему экзистенциальной философии, посмотреть выступления TED и т. д.</p>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 8. МЕТОД POМИДОРА -->
-  <section id="pomodoro" class="page-section">
-    <h2>Метод Pomodoro</h2>
-    <p>Техника Pomodoro — это способ организовать работу и отдых. Стандартная схема: 25 минут работы, 5 минут перерыва.</p>
-    <div class="pomodoro-timer">
-      <h3>Pomodoro Таймер</h3>
-      <div id="timer-display">25:00</div>
-      <button id="start-btn" class="main-btn">Старт</button>
-      <button id="pause-btn" class="main-btn">Пауза</button>
-      <button id="reset-btn" class="main-btn">Сброс</button>
-    </div>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 9. LOFI -->
-  <section id="lofi" class="page-section">
-    <h2>Lofi Radio</h2>
-    <p>Нажмите на кнопку, чтобы перейти к трансляции Lofi Radio.</p>
-    <a href="https://www.youtube.com/watch?v=5qap5aO4i9A" target="_blank" class="main-btn">Перейти к Lofi Radio</a>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 10. TELEGRAM -->
-  <section id="telegram" class="page-section">
-    <h2>Telegram-чат проекта</h2>
-    <p>Нажмите, чтобы перейти в наш Telegram-чат:</p>
-    <a href="https://t.me/your_chat_link" target="_blank" class="main-btn">Перейти в чат</a>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 11. ПРОФ ОРИЕНТАЦИЯ -->
-  <section id="prof" class="page-section">
-    <h2>Профориентация</h2>
-    <p>Выберите ресурс:</p>
-    <div class="buttons-grid">
-      <a href="https://proforientator.ru/" target="_blank" class="main-btn">Proforientator</a>
-      <a href="https://proforientir.ru/" target="_blank" class="main-btn">Proforientir</a>
-      <a href="https://example.com/" target="_blank" class="main-btn">Другой сайт</a>
-    </div>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- 12. GITHUB -->
-  <section id="github" class="page-section">
-    <h2>GitHub проекта</h2>
-    <p>Перейдите, чтобы посмотреть репозиторий автора на GitHub:</p>
-    <a href="https://github.com/yourusername" target="_blank" class="main-btn">GitHub</a>
-    <div>
-      <span class="back-link" onclick="hideSection()">← На главную</span>
-    </div>
-  </section>
-
-  <!-- ====== СКРИПТЫ ====== -->
   <script>
-    // Функция для отображения выбранной секции
-    function showSection(sectionId) {
-      // Скрываем главное меню
-      document.getElementById('main-menu').style.display = 'none';
-      // Скрываем все секции
-      const sections = document.querySelectorAll('.page-section');
-      sections.forEach(section => {
-        section.style.display = 'none';
-      });
-      // Отображаем нужную секцию
-      if (sectionId) {
-        document.getElementById(sectionId).style.display = 'block';
-      }
-      // Прокрутка в начало экрана
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    // Получение элементов
+    const video = document.getElementById('video');
+    const drawingCanvas = document.getElementById('drawingCanvas');
+    const ctx = drawingCanvas.getContext('2d');
+    const colorPickerButton = document.getElementById('colorPickerButton');
+    const colorPicker = document.getElementById('colorPicker');
 
-    // Функция для возврата к главному меню
-    function hideSection() {
-      // Скрываем все секции
-      const sections = document.querySelectorAll('.page-section');
-      sections.forEach(section => {
-        section.style.display = 'none';
-      });
-      // Показываем главное меню
-      document.getElementById('main-menu').style.display = 'block';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    // Настройки рисования
+    let drawingColor = "#ff0000"; // базовый цвет лазера – красный
+    let mode = "draw"; // режим: "draw" (рисование) или "erase" (ластик)
+    let toggleCount = 0; // счетчик переключений (лазер включен/выключен)
+    let previousLaserDetected = false; // предыдущее состояние обнаружения лазера
+    let lastPos = null; // предыдущая координата для рисования линий
 
-    // Функция для скролла к элементу внутри секции
-    function scrollToId(id) {
-      const element = document.getElementById(id);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
+    // Для обработки кадров видео создаем скрытый canvas
+    const processingCanvas = document.createElement('canvas');
+    const procCtx = processingCanvas.getContext('2d');
 
-    // ====== Pomodoro Timer ======
-    let timer;
-    let isRunning = false;
-    let timeLeft = 25 * 60; // 25 минут
-    const display = document.getElementById('timer-display');
-    const startBtn = document.getElementById('start-btn');
-    const pauseBtn = document.getElementById('pause-btn');
-    const resetBtn = document.getElementById('reset-btn');
+    // Запрос к камере: предпочтительно задняя (environment)
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { exact: "environment" } },
+      audio: false
+    }).then(stream => {
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        video.play();
+        // Устанавливаем размеры canvas в соответствии с видео (можно брать размеры окна)
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        drawingCanvas.width = width;
+        drawingCanvas.height = height;
+        processingCanvas.width = width;
+        processingCanvas.height = height;
+        // Начинаем обработку кадров
+        requestAnimationFrame(processFrame);
+      };
+    }).catch(err => {
+      console.error("Ошибка доступа к камере: ", err);
+      alert("Не удалось получить доступ к камере.");
+    });
 
-    if (startBtn && pauseBtn && resetBtn) {
-      updateDisplay(timeLeft);
-      startBtn.addEventListener('click', startTimer);
-      pauseBtn.addEventListener('click', pauseTimer);
-      resetBtn.addEventListener('click', resetTimer);
-    }
+    // Логика выбора цвета через кнопку
+    colorPickerButton.addEventListener('click', () => {
+      colorPicker.click();
+    });
 
-    function startTimer() {
-      if (!isRunning) {
-        isRunning = true;
-        timer = setInterval(() => {
-          timeLeft--;
-          updateDisplay(timeLeft);
-          if (timeLeft <= 0) {
-            clearInterval(timer);
-            isRunning = false;
-            playAlarm();
+    colorPicker.addEventListener('change', (event) => {
+      drawingColor = event.target.value;
+    });
+
+    /**
+     * Обработка каждого кадра видео:
+     * – копируем текущий кадр в скрытый canvas,
+     * – ищем яркие красные области (лазорный луч),
+     * – если точка найдена, рисуем линию между точками,
+     * – отслеживаем переключения (отсутствие и присутствие лазера) для смены режима.
+     */
+    function processFrame() {
+      // Рисуем текущий кадр из видео на processingCanvas
+      procCtx.drawImage(video, 0, 0, processingCanvas.width, processingCanvas.height);
+      const frame = procCtx.getImageData(0, 0, processingCanvas.width, processingCanvas.height);
+      const data = frame.data;
+
+      let sumX = 0, sumY = 0, count = 0;
+      // Пробегаемся по пикселям с шагом (например, 5 пикселей для ускорения)
+      for (let y = 0; y < processingCanvas.height; y += 5) {
+        for (let x = 0; x < processingCanvas.width; x += 5) {
+          const index = (y * processingCanvas.width + x) * 4;
+          const r = data[index], g = data[index + 1], b = data[index + 2];
+          // Простая фильтрация: если красный канал очень высокий и значительно превосходит зеленый и синий
+          if (r > 200 && r > g + 50 && r > b + 50) {
+            sumX += x;
+            sumY += y;
+            count++;
           }
-        }, 1000);
+        }
       }
-    }
 
-    function pauseTimer() {
-      clearInterval(timer);
-      isRunning = false;
-    }
-
-    function resetTimer() {
-      clearInterval(timer);
-      isRunning = false;
-      timeLeft = 25 * 60;
-      updateDisplay(timeLeft);
-    }
-
-    function updateDisplay(seconds) {
-      const min = Math.floor(seconds / 60);
-      const sec = seconds % 60;
-      if (display) {
-        display.textContent = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+      let laserDetected = count > 0;
+      let pos = null;
+      if (laserDetected) {
+        pos = { x: sumX / count, y: sumY / count };
       }
-    }
 
-    // Проигрывание звука при окончании (замените 'alarm.mp3' на свой файл)
-    function playAlarm() {
-      const audio = new Audio('alarm.mp3');
-      audio.play().catch(e => console.log(e));
+      // Если лазер ранее был обнаружен, а теперь его нет – считаем переключение
+      if (previousLaserDetected && !laserDetected) {
+        toggleCount++;
+        // Если переключили 3 раза, меняем режим (рисование <-> ластик)
+        if (toggleCount >= 3) {
+          mode = (mode === "draw") ? "erase" : "draw";
+          console.log("Режим переключён на:", mode);
+          toggleCount = 0;
+        }
+      }
+      previousLaserDetected = laserDetected;
+
+      // Если обнаружена позиция лазера, рисуем линию (сглаживание посредством интерполяции между предыдущей и текущей координатой)
+      if (pos) {
+        ctx.lineWidth = 5;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        // В режиме "erase" рисуем белой линией (при условии что фон белый или можем очистить участок)
+        ctx.strokeStyle = (mode === "draw") ? drawingColor : "#ffffff";
+
+        ctx.beginPath();
+        if (lastPos) {
+          // Рисуем линию от предыдущей до текущей позиции
+          ctx.moveTo(lastPos.x, lastPos.y);
+        } else {
+          ctx.moveTo(pos.x, pos.y);
+        }
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        lastPos = pos;
+      } else {
+        // Если лазер не обнаружен – сбрасываем предыдущую позицию, чтобы избежать линии при повторном появлении
+        lastPos = null;
+      }
+
+      // Рекурсивный вызов для следующего кадра
+      requestAnimationFrame(processFrame);
     }
   </script>
-
 </body>
-  </html>
+</html>
