@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Тёмный калькулятор в стиле Ван Гога</title>
+  <title>Калькулятор в стиле тёмного звёздного неба</title>
   <style>
-    /* Фон со «Звёздной ночью» с тёмным оверлеем */
+    /* Фон с изображением тёмного звёздного неба */
     body {
       margin: 0;
       padding: 0;
-      background: url('https://upload.wikimedia.org/wikipedia/commons/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg') center/cover no-repeat;
+      background: url('https://upload.wikimedia.org/wikipedia/commons/0/0e/Starsinthesky2.jpg') center/cover no-repeat;
       position: relative;
       min-height: 100vh;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -21,24 +21,19 @@
     body::before {
       content: "";
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.65); /* тёмный оверлей */
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7); /* тёмный оверлей для затемнения фона */
       z-index: 0;
     }
-    /* Контейнер калькулятора */
     .calculator {
       position: relative;
       z-index: 1;
-      background: rgba(20, 20, 20, 0.9);
+      background: rgba(20, 20, 20, 0.95);
       border-radius: 15px;
-      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
       width: 350px;
       padding: 20px;
     }
-    /* Экран калькулятора */
     .display {
       background: #222;
       color: #fff;
@@ -49,7 +44,6 @@
       margin-bottom: 15px;
       word-wrap: break-word;
     }
-    /* Кнопка голосового ввода */
     .voice-btn {
       width: 100%;
       background: #b37b00;
@@ -65,7 +59,6 @@
     .voice-btn:hover {
       background: #9e6400;
     }
-    /* Кнопки калькулятора */
     .buttons {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -90,120 +83,119 @@
   </style>
 </head>
 <body>
-<div class="calculator">
-  <div class="display" id="display">0</div>
-  <button class="voice-btn" id="voiceBtn">Голосовой ввод</button>
-  <div class="buttons">
-    <!-- Дополнительные функции -->
-    <button onclick="appendValue('√(')">√</button>
-    <button onclick="appendValue('(')">(</button>
-    <button onclick="appendValue(')')">)</button>
-    <button onclick="clearDisplay()">C</button>
-    
-    <!-- Цифры и базовые операторы -->
-    <button onclick="appendValue('7')">7</button>
-    <button onclick="appendValue('8')">8</button>
-    <button onclick="appendValue('9')">9</button>
-    <button onclick="appendValue('/')">÷</button>
-    
-    <button onclick="appendValue('4')">4</button>
-    <button onclick="appendValue('5')">5</button>
-    <button onclick="appendValue('6')">6</button>
-    <button onclick="appendValue('*')">×</button>
-    
-    <button onclick="appendValue('1')">1</button>
-    <button onclick="appendValue('2')">2</button>
-    <button onclick="appendValue('3')">3</button>
-    <button onclick="appendValue('-')">−</button>
-    
-    <button onclick="appendValue('0')">0</button>
-    <button onclick="appendValue('.')">.</button>
-    <button onclick="calculateResult()">=</button>
-    <button onclick="appendValue('+')">+</button>
+  <div class="calculator">
+    <div class="display" id="display">0</div>
+    <button class="voice-btn" id="voiceBtn">Голосовой ввод</button>
+    <div class="buttons">
+      <!-- Дополнительные функции -->
+      <button onclick="appendValue('√(')">√</button>
+      <button onclick="appendValue('(')">(</button>
+      <button onclick="appendValue(')')">)</button>
+      <button onclick="clearDisplay()">C</button>
+      
+      <!-- Цифры и базовые операторы -->
+      <button onclick="appendValue('7')">7</button>
+      <button onclick="appendValue('8')">8</button>
+      <button onclick="appendValue('9')">9</button>
+      <button onclick="appendValue('/')">÷</button>
+      
+      <button onclick="appendValue('4')">4</button>
+      <button onclick="appendValue('5')">5</button>
+      <button onclick="appendValue('6')">6</button>
+      <button onclick="appendValue('*')">×</button>
+      
+      <button onclick="appendValue('1')">1</button>
+      <button onclick="appendValue('2')">2</button>
+      <button onclick="appendValue('3')">3</button>
+      <button onclick="appendValue('-')">−</button>
+      
+      <button onclick="appendValue('0')">0</button>
+      <button onclick="appendValue('.')">.</button>
+      <button onclick="calculateResult()">=</button>
+      <button onclick="appendValue('+')">+</button>
+    </div>
   </div>
-</div>
-
-<script>
-  const display = document.getElementById('display');
-
-  function appendValue(val) {
-    if (display.innerText === "0" || display.innerText === "Ошибка") {
-      display.innerText = val;
-    } else {
-      display.innerText += val;
-    }
-  }
-
-  function clearDisplay() {
-    display.innerText = "0";
-  }
-
-  function calculateResult() {
-    try {
-      let expression = display.innerText;
-      // Замена квадратного корня: преобразование √(выражение) в Math.sqrt(выражение)
-      expression = expression.replace(/√\(([^)]+)\)/g, 'Math.sqrt($1)');
-      let result = eval(expression);
-      display.innerText = result;
-    } catch (e) {
-      display.innerText = "Ошибка";
-    }
-  }
-
-  // Голосовое управление
-  const voiceBtn = document.getElementById('voiceBtn');
-  window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recognition;
-  if (window.SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'ru-RU';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onresult = function(event) {
-      const transcript = event.results[0][0].transcript;
-      processVoiceCommand(transcript);
-    };
-
-    recognition.onerror = function(event) {
-      console.error("Ошибка распознавания: ", event.error);
-    };
-  } else {
-    voiceBtn.disabled = true;
-    voiceBtn.innerText = "Голосовое управление не поддерживается";
-  }
-
-  function processVoiceCommand(command) {
-    command = command.toLowerCase();
-    // Замена устных выражений на математические операторы
-    command = command.replace(/плюс/g, "+")
-                     .replace(/минус/g, "-")
-                     .replace(/умножить( на)?/g, "*")
-                     .replace(/разделить( на)?/g, "/")
-                     .replace(/точка/g, ".")
-                     .replace(/корень из/g, "√(");
-    // Убираем лишние слова
-    command = command.replace(/(?:вычисли|посчитай|считай|калькулятор)/g, "");
-    command = command.replace(/\s+/g, "");
+  
+  <script>
+    const display = document.getElementById('display');
     
-    // Если команда содержит √( без закрывающей скобки, добавляем её
-    if(command.includes("√(") && !command.endsWith(")")){
-      command += ")";
+    function appendValue(val) {
+      if (display.innerText === "0" || display.innerText === "Ошибка") {
+        display.innerText = val;
+      } else {
+        display.innerText += val;
+      }
     }
-
-    try {
-      let result = eval(command.replace(/√\(([^)]+)\)/g, 'Math.sqrt($1)'));
-      display.innerText = result;
-    } catch (e) {
-      display.innerText = "Ошибка";
+    
+    function clearDisplay() {
+      display.innerText = "0";
     }
-  }
-
-  voiceBtn.addEventListener('click', function(){
-    if (recognition) {
-      recognition.start();
+    
+    function calculateResult() {
+      try {
+        let expression = display.innerText;
+        // Замена квадратного корня: преобразуем √(выражение) в Math.sqrt(выражение)
+        expression = expression.replace(/√\(([^)]+)\)/g, 'Math.sqrt($1)');
+        let result = eval(expression);
+        display.innerText = result;
+      } catch (e) {
+        display.innerText = "Ошибка";
+      }
     }
-  });
-</script>
+    
+    // Голосовое управление
+    const voiceBtn = document.getElementById('voiceBtn');
+    window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    if (window.SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'ru-RU';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+  
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        processVoiceCommand(transcript);
+      };
+  
+      recognition.onerror = function(event) {
+        console.error("Ошибка распознавания: ", event.error);
+      };
+    } else {
+      voiceBtn.disabled = true;
+      voiceBtn.innerText = "Голосовое управление не поддерживается";
+    }
+    
+    function processVoiceCommand(command) {
+      command = command.toLowerCase();
+      // Замена устных выражений на математические операторы
+      command = command.replace(/плюс/g, "+")
+                       .replace(/минус/g, "-")
+                       .replace(/умножить( на)?/g, "*")
+                       .replace(/разделить( на)?/g, "/")
+                       .replace(/точка/g, ".")
+                       .replace(/корень из/g, "√(");
+      // Убираем лишние слова
+      command = command.replace(/(?:вычисли|посчитай|считай|калькулятор)/g, "");
+      command = command.replace(/\s+/g, "");
+      
+      if(command.includes("√(") && !command.endsWith(")")){
+        command += ")";
+      }
+  
+      try {
+        let result = eval(command.replace(/√\(([^)]+)\)/g, 'Math.sqrt($1)'));
+        display.innerText = result;
+      } catch (e) {
+        display.innerText = "Ошибка";
+      }
+    }
+    
+    voiceBtn.addEventListener('click', function(){
+      if (recognition) {
+        recognition.start();
+      }
+    });
+  </script>
 </body>
 </html>
