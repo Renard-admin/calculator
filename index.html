@@ -3,28 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Калькулятор в стиле Ван Гога</title>
+  <title>Тёмный калькулятор в стиле Ван Гога</title>
   <style>
-    /* Фон со «Звёздной ночью» Ван Гога (работает, так как картина находится в общественном достоянии) */
+    /* Фон со «Звёздной ночью» с тёмным оверлеем */
     body {
       margin: 0;
       padding: 0;
-      background-image: url('https://upload.wikimedia.org/wikipedia/commons/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg');
-      background-size: cover;
-      background-position: center;
+      background: url('https://upload.wikimedia.org/wikipedia/commons/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg') center/cover no-repeat;
+      position: relative;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #fff;
     }
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.65); /* тёмный оверлей */
+      z-index: 0;
+    }
+    /* Контейнер калькулятора */
     .calculator {
-      background: rgba(255, 255, 255, 0.9);
+      position: relative;
+      z-index: 1;
+      background: rgba(20, 20, 20, 0.9);
       border-radius: 15px;
-      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
       width: 350px;
-      padding: 15px;
+      padding: 20px;
     }
+    /* Экран калькулятора */
     .display {
       background: #222;
       color: #fff;
@@ -32,24 +46,26 @@
       font-size: 36px;
       padding: 15px;
       border-radius: 10px;
-      margin-bottom: 10px;
+      margin-bottom: 15px;
       word-wrap: break-word;
     }
+    /* Кнопка голосового ввода */
     .voice-btn {
       width: 100%;
-      background: #FFAA00;
+      background: #b37b00;
       border: none;
       color: #fff;
       font-size: 20px;
       padding: 10px;
       border-radius: 5px;
-      margin-bottom: 10px;
+      margin-bottom: 15px;
       cursor: pointer;
       transition: background 0.3s;
     }
     .voice-btn:hover {
-      background: #e09b00;
+      background: #9e6400;
     }
+    /* Кнопки калькулятора */
     .buttons {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -60,13 +76,13 @@
       font-size: 22px;
       border: none;
       border-radius: 5px;
-      background: #FFC107;
-      color: #333;
+      background: #333;
+      color: #f9f9f9;
       cursor: pointer;
       transition: background 0.3s;
     }
     .buttons button:hover {
-      background: #e0a800;
+      background: #444;
     }
     .full-width {
       grid-column: span 4;
@@ -84,7 +100,7 @@
     <button onclick="appendValue(')')">)</button>
     <button onclick="clearDisplay()">C</button>
     
-    <!-- Цифровые и базовые операторы -->
+    <!-- Цифры и базовые операторы -->
     <button onclick="appendValue('7')">7</button>
     <button onclick="appendValue('8')">8</button>
     <button onclick="appendValue('9')">9</button>
@@ -125,7 +141,7 @@
   function calculateResult() {
     try {
       let expression = display.innerText;
-      // Замена корня: ищем подстроки вида √(выражение) и заменяем на Math.sqrt(выражение)
+      // Замена квадратного корня: преобразование √(выражение) в Math.sqrt(выражение)
       expression = expression.replace(/√\(([^)]+)\)/g, 'Math.sqrt($1)');
       let result = eval(expression);
       display.innerText = result;
@@ -136,7 +152,6 @@
 
   // Голосовое управление
   const voiceBtn = document.getElementById('voiceBtn');
-  // Поддержка стандартного SpeechRecognition или webkitSpeechRecognition
   window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition;
   if (window.SpeechRecognition) {
@@ -160,18 +175,18 @@
 
   function processVoiceCommand(command) {
     command = command.toLowerCase();
-    // Заменяем устные команды на операторы
+    // Замена устных выражений на математические операторы
     command = command.replace(/плюс/g, "+")
                      .replace(/минус/g, "-")
                      .replace(/умножить( на)?/g, "*")
                      .replace(/разделить( на)?/g, "/")
                      .replace(/точка/g, ".")
                      .replace(/корень из/g, "√(");
-    // Удаляем лишние слова
+    // Убираем лишние слова
     command = command.replace(/(?:вычисли|посчитай|считай|калькулятор)/g, "");
     command = command.replace(/\s+/g, "");
     
-    // Если команда содержит √( и нет закрывающей скобки в конце, добавляем её
+    // Если команда содержит √( без закрывающей скобки, добавляем её
     if(command.includes("√(") && !command.endsWith(")")){
       command += ")";
     }
