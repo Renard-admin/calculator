@@ -2,181 +2,168 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Лазерное рисование</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Калькулятор с голосовым управлением</title>
   <style>
-    /* Сброс отступов и настройка размеров */
-    html, body {
+    body {
+      background: #f0f0f0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
       margin: 0;
-      padding: 0;
+    }
+    .calculator {
+      background: #fff;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-radius: 10px;
       overflow: hidden;
-      background: #000;
-      height: 100%;
+      width: 320px;
     }
-    /* Видео занимает весь экран */
-    #video {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: 1;
+    .display {
+      background: #222;
+      color: #fff;
+      text-align: right;
+      font-size: 32px;
+      padding: 20px;
+      word-wrap: break-word;
     }
-    /* Canvas для рисования поверх видео */
-    #drawingCanvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 2;
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
     }
-    /* Кнопка выбора цвета в правом верхнем углу */
-    #colorPickerButton {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      z-index: 3;
-      padding: 8px 12px;
-      font-size: 14px;
+    .buttons button {
+      border: 1px solid #ddd;
+      background: #fff;
+      font-size: 20px;
+      padding: 20px;
+      outline: none;
+      transition: background 0.3s;
+    }
+    .buttons button:hover {
+      background: #eee;
       cursor: pointer;
     }
-    /* Скрытый input для выбора цвета */
-    #colorPicker {
-      display: none;
+    .voice-btn {
+      width: 100%;
+      background: #007BFF;
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      padding: 10px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .voice-btn:hover {
+      background: #0056b3;
+    }
+    .full-width {
+      grid-column: span 4;
     }
   </style>
 </head>
 <body>
-  <!-- Видео с камеры -->
-  <video id="video" autoplay playsinline></video>
-  <!-- Canvas для рисования -->
-  <canvas id="drawingCanvas"></canvas>
-  <!-- Кнопка выбора цвета -->
-  <button id="colorPickerButton">Цвет линии</button>
-  <input type="color" id="colorPicker">
 
-  <script>
-    // Получение элементов
-    const video = document.getElementById('video');
-    const drawingCanvas = document.getElementById('drawingCanvas');
-    const ctx = drawingCanvas.getContext('2d');
-    const colorPickerButton = document.getElementById('colorPickerButton');
-    const colorPicker = document.getElementById('colorPicker');
+<div class="calculator">
+  <div class="display" id="display">0</div>
+  <button class="voice-btn" id="voiceBtn">Голосовой ввод</button>
+  <div class="buttons">
+    <button onclick="appendValue('7')">7</button>
+    <button onclick="appendValue('8')">8</button>
+    <button onclick="appendValue('9')">9</button>
+    <button onclick="appendValue('/')">÷</button>
+    
+    <button onclick="appendValue('4')">4</button>
+    <button onclick="appendValue('5')">5</button>
+    <button onclick="appendValue('6')">6</button>
+    <button onclick="appendValue('*')">×</button>
+    
+    <button onclick="appendValue('1')">1</button>
+    <button onclick="appendValue('2')">2</button>
+    <button onclick="appendValue('3')">3</button>
+    <button onclick="appendValue('-')">−</button>
+    
+    <button onclick="appendValue('0')">0</button>
+    <button onclick="appendValue('.')">.</button>
+    <button onclick="calculateResult()">=</button>
+    <button onclick="appendValue('+')">+</button>
+    
+    <button class="full-width" onclick="clearDisplay()">C</button>
+  </div>
+</div>
 
-    // Настройки рисования
-    let drawingColor = "#ff0000"; // базовый цвет лазера – красный
-    let mode = "draw"; // режим: "draw" (рисование) или "erase" (ластик)
-    let toggleCount = 0; // счетчик переключений (лазер включен/выключен)
-    let previousLaserDetected = false; // предыдущее состояние обнаружения лазера
-    let lastPos = null; // предыдущая координата для рисования линий
+<script>
+  const display = document.getElementById('display');
 
-    // Для обработки кадров видео создаем скрытый canvas
-    const processingCanvas = document.createElement('canvas');
-    const procCtx = processingCanvas.getContext('2d');
-
-    // Запрос к камере: предпочтительно задняя (environment)
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { exact: "environment" } },
-      audio: false
-    }).then(stream => {
-      video.srcObject = stream;
-      video.onloadedmetadata = () => {
-        video.play();
-        // Устанавливаем размеры canvas в соответствии с видео (можно брать размеры окна)
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        drawingCanvas.width = width;
-        drawingCanvas.height = height;
-        processingCanvas.width = width;
-        processingCanvas.height = height;
-        // Начинаем обработку кадров
-        requestAnimationFrame(processFrame);
-      };
-    }).catch(err => {
-      console.error("Ошибка доступа к камере: ", err);
-      alert("Не удалось получить доступ к камере.");
-    });
-
-    // Логика выбора цвета через кнопку
-    colorPickerButton.addEventListener('click', () => {
-      colorPicker.click();
-    });
-
-    colorPicker.addEventListener('change', (event) => {
-      drawingColor = event.target.value;
-    });
-
-    /**
-     * Обработка каждого кадра видео:
-     * – копируем текущий кадр в скрытый canvas,
-     * – ищем яркие красные области (лазорный луч),
-     * – если точка найдена, рисуем линию между точками,
-     * – отслеживаем переключения (отсутствие и присутствие лазера) для смены режима.
-     */
-    function processFrame() {
-      // Рисуем текущий кадр из видео на processingCanvas
-      procCtx.drawImage(video, 0, 0, processingCanvas.width, processingCanvas.height);
-      const frame = procCtx.getImageData(0, 0, processingCanvas.width, processingCanvas.height);
-      const data = frame.data;
-
-      let sumX = 0, sumY = 0, count = 0;
-      // Пробегаемся по пикселям с шагом (например, 5 пикселей для ускорения)
-      for (let y = 0; y < processingCanvas.height; y += 5) {
-        for (let x = 0; x < processingCanvas.width; x += 5) {
-          const index = (y * processingCanvas.width + x) * 4;
-          const r = data[index], g = data[index + 1], b = data[index + 2];
-          // Простая фильтрация: если красный канал очень высокий и значительно превосходит зеленый и синий
-          if (r > 200 && r > g + 50 && r > b + 50) {
-            sumX += x;
-            sumY += y;
-            count++;
-          }
-        }
-      }
-
-      let laserDetected = count > 0;
-      let pos = null;
-      if (laserDetected) {
-        pos = { x: sumX / count, y: sumY / count };
-      }
-
-      // Если лазер ранее был обнаружен, а теперь его нет – считаем переключение
-      if (previousLaserDetected && !laserDetected) {
-        toggleCount++;
-        // Если переключили 3 раза, меняем режим (рисование <-> ластик)
-        if (toggleCount >= 3) {
-          mode = (mode === "draw") ? "erase" : "draw";
-          console.log("Режим переключён на:", mode);
-          toggleCount = 0;
-        }
-      }
-      previousLaserDetected = laserDetected;
-
-      // Если обнаружена позиция лазера, рисуем линию (сглаживание посредством интерполяции между предыдущей и текущей координатой)
-      if (pos) {
-        ctx.lineWidth = 5;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        // В режиме "erase" рисуем белой линией (при условии что фон белый или можем очистить участок)
-        ctx.strokeStyle = (mode === "draw") ? drawingColor : "#ffffff";
-
-        ctx.beginPath();
-        if (lastPos) {
-          // Рисуем линию от предыдущей до текущей позиции
-          ctx.moveTo(lastPos.x, lastPos.y);
-        } else {
-          ctx.moveTo(pos.x, pos.y);
-        }
-        ctx.lineTo(pos.x, pos.y);
-        ctx.stroke();
-        lastPos = pos;
-      } else {
-        // Если лазер не обнаружен – сбрасываем предыдущую позицию, чтобы избежать линии при повторном появлении
-        lastPos = null;
-      }
-
-      // Рекурсивный вызов для следующего кадра
-      requestAnimationFrame(processFrame);
+  function appendValue(val) {
+    if (display.innerText === "0" || display.innerText === "Ошибка") {
+      display.innerText = val;
+    } else {
+      display.innerText += val;
     }
-  </script>
+  }
+
+  function clearDisplay() {
+    display.innerText = "0";
+  }
+
+  function calculateResult() {
+    try {
+      display.innerText = eval(display.innerText);
+    } catch {
+      display.innerText = "Ошибка";
+    }
+  }
+
+  // Голосовое управление
+  const voiceBtn = document.getElementById('voiceBtn');
+  let recognition;
+  if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.lang = 'ru-RU';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = function(event) {
+      const transcript = event.results[0][0].transcript;
+      processVoiceCommand(transcript);
+    };
+
+    recognition.onerror = function(event) {
+      console.error("Ошибка распознавания: ", event.error);
+    };
+  } else {
+    voiceBtn.disabled = true;
+    voiceBtn.innerText = "Голосовое управление не поддерживается";
+  }
+
+  function processVoiceCommand(command) {
+    // Приводим команду к нижнему регистру и заменяем слова на математические операторы
+    command = command.toLowerCase();
+    command = command.replace(/плюс/g, "+")
+                     .replace(/минус/g, "-")
+                     .replace(/умножить( на)?/g, "*")
+                     .replace(/разделить( на)?/g, "/")
+                     .replace(/точка/g, ".");
+    // Убираем возможные лишние слова
+    command = command.replace(/(?:вычисли|посчитай|считай|калькулятор)/g, "");
+    command = command.replace(/\s+/g, "");
+    
+    try {
+      const result = eval(command);
+      display.innerText = result;
+    } catch (e) {
+      display.innerText = "Ошибка";
+    }
+  }
+
+  voiceBtn.addEventListener('click', function(){
+    if (recognition) {
+      recognition.start();
+    }
+  });
+</script>
+
 </body>
 </html>
