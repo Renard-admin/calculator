@@ -3,60 +3,70 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Калькулятор с голосовым управлением</title>
+  <title>Калькулятор в стиле Ван Гога</title>
   <style>
+    /* Фон со «Звёздной ночью» Ван Гога (работает, так как картина находится в общественном достоянии) */
     body {
-      background: #f0f0f0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-image: url('https://upload.wikimedia.org/wikipedia/commons/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg');
+      background-size: cover;
+      background-position: center;
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
-      margin: 0;
+      height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     .calculator {
-      background: #fff;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      border-radius: 10px;
-      overflow: hidden;
-      width: 320px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 15px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+      width: 350px;
+      padding: 15px;
     }
     .display {
       background: #222;
       color: #fff;
       text-align: right;
-      font-size: 32px;
-      padding: 20px;
+      font-size: 36px;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 10px;
       word-wrap: break-word;
-    }
-    .buttons {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-    }
-    .buttons button {
-      border: 1px solid #ddd;
-      background: #fff;
-      font-size: 20px;
-      padding: 20px;
-      outline: none;
-      transition: background 0.3s;
-    }
-    .buttons button:hover {
-      background: #eee;
-      cursor: pointer;
     }
     .voice-btn {
       width: 100%;
-      background: #007BFF;
+      background: #FFAA00;
       border: none;
       color: #fff;
-      font-size: 18px;
+      font-size: 20px;
       padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
       cursor: pointer;
       transition: background 0.3s;
     }
     .voice-btn:hover {
-      background: #0056b3;
+      background: #e09b00;
+    }
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .buttons button {
+      padding: 15px;
+      font-size: 22px;
+      border: none;
+      border-radius: 5px;
+      background: #FFC107;
+      color: #333;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .buttons button:hover {
+      background: #e0a800;
     }
     .full-width {
       grid-column: span 4;
@@ -64,11 +74,17 @@
   </style>
 </head>
 <body>
-
 <div class="calculator">
   <div class="display" id="display">0</div>
   <button class="voice-btn" id="voiceBtn">Голосовой ввод</button>
   <div class="buttons">
+    <!-- Дополнительные функции -->
+    <button onclick="appendValue('√(')">√</button>
+    <button onclick="appendValue('(')">(</button>
+    <button onclick="appendValue(')')">)</button>
+    <button onclick="clearDisplay()">C</button>
+    
+    <!-- Цифровые и базовые операторы -->
     <button onclick="appendValue('7')">7</button>
     <button onclick="appendValue('8')">8</button>
     <button onclick="appendValue('9')">9</button>
@@ -88,8 +104,6 @@
     <button onclick="appendValue('.')">.</button>
     <button onclick="calculateResult()">=</button>
     <button onclick="appendValue('+')">+</button>
-    
-    <button class="full-width" onclick="clearDisplay()">C</button>
   </div>
 </div>
 
@@ -110,17 +124,23 @@
 
   function calculateResult() {
     try {
-      display.innerText = eval(display.innerText);
-    } catch {
+      let expression = display.innerText;
+      // Замена корня: ищем подстроки вида √(выражение) и заменяем на Math.sqrt(выражение)
+      expression = expression.replace(/√\(([^)]+)\)/g, 'Math.sqrt($1)');
+      let result = eval(expression);
+      display.innerText = result;
+    } catch (e) {
       display.innerText = "Ошибка";
     }
   }
 
   // Голосовое управление
   const voiceBtn = document.getElementById('voiceBtn');
+  // Поддержка стандартного SpeechRecognition или webkitSpeechRecognition
+  window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition;
-  if ('webkitSpeechRecognition' in window) {
-    recognition = new webkitSpeechRecognition();
+  if (window.SpeechRecognition) {
+    recognition = new SpeechRecognition();
     recognition.lang = 'ru-RU';
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -139,19 +159,25 @@
   }
 
   function processVoiceCommand(command) {
-    // Приводим команду к нижнему регистру и заменяем слова на математические операторы
     command = command.toLowerCase();
+    // Заменяем устные команды на операторы
     command = command.replace(/плюс/g, "+")
                      .replace(/минус/g, "-")
                      .replace(/умножить( на)?/g, "*")
                      .replace(/разделить( на)?/g, "/")
-                     .replace(/точка/g, ".");
-    // Убираем возможные лишние слова
+                     .replace(/точка/g, ".")
+                     .replace(/корень из/g, "√(");
+    // Удаляем лишние слова
     command = command.replace(/(?:вычисли|посчитай|считай|калькулятор)/g, "");
     command = command.replace(/\s+/g, "");
     
+    // Если команда содержит √( и нет закрывающей скобки в конце, добавляем её
+    if(command.includes("√(") && !command.endsWith(")")){
+      command += ")";
+    }
+
     try {
-      const result = eval(command);
+      let result = eval(command.replace(/√\(([^)]+)\)/g, 'Math.sqrt($1)'));
       display.innerText = result;
     } catch (e) {
       display.innerText = "Ошибка";
@@ -164,6 +190,5 @@
     }
   });
 </script>
-
 </body>
 </html>
