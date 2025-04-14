@@ -93,6 +93,9 @@
       <button onclick="appendValue(')')">)</button>
       <button onclick="clearDisplay()">C</button>
       
+      <!-- Новая кнопка для удаления одного символа -->
+      <button onclick="backspace()">⌫</button>
+      
       <!-- Цифры и базовые операторы -->
       <button onclick="appendValue('7')">7</button>
       <button onclick="appendValue('8')">8</button>
@@ -129,6 +132,15 @@
     
     function clearDisplay() {
       display.innerText = "0";
+    }
+    
+    function backspace() {
+      // Удаление последнего символа
+      if (display.innerText.length > 1) {
+        display.innerText = display.innerText.slice(0, -1);
+      } else {
+        display.innerText = "0";
+      }
     }
     
     function calculateResult() {
@@ -194,6 +206,28 @@
     voiceBtn.addEventListener('click', function(){
       if (recognition) {
         recognition.start();
+      }
+    });
+    
+    // Обработка ввода с клавиатуры
+    document.addEventListener('keydown', function(event) {
+      const key = event.key;
+      
+      // Если отображается "Ошибка", при новом вводе сбрасываем дисплей
+      if (display.innerText === "Ошибка") {
+        clearDisplay();
+      }
+      
+      // Разрешённые символы: цифры, операторы, скобки и точка.
+      if ((key >= '0' && key <= '9') || "+-*/().".includes(key)) {
+        appendValue(key);
+      } else if (key === 'Enter') {
+        calculateResult();
+      } else if (key === 'Backspace') {
+        event.preventDefault();
+        backspace();
+      } else if (key === 'Escape') {
+        clearDisplay();
       }
     });
   </script>
