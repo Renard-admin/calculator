@@ -231,5 +231,37 @@
       }
     });
   </script>
+  
+  <!-- Новый блок скрипта для звука (не изменяя существующий код) -->
+  <script>
+    // Создаём аудиоэлемент для воспроизведения звука
+    const audio = document.createElement("audio");
+    // Вставьте путь до вашего mp3 файла ниже:
+    audio.src = "fasadasdadsaddddddddddddddddddddddd"; // например: "sounds/alert.mp3"
+    audio.preload = "auto";
+    
+    // Функция для воспроизведения звука
+    function playSound() {
+      audio.play();
+    }
+    
+    // Каждые 15 секунд воспроизводится звук
+    let soundInterval = setInterval(playSound, 15000);
+    
+    // Наблюдатель за изменениями дисплея для проверки условия "64+64"
+    const observer = new MutationObserver(mutations => {
+      mutations.forEach(mutation => {
+        if (mutation.target.textContent === "128") {
+          // Останавливаем воспроизведение звука
+          clearInterval(soundInterval);
+          // Заменяем "128" на сообщение "звук выключен"
+          mutation.target.textContent = "звук выключен";
+        }
+      });
+    });
+    
+    // Наблюдаем за изменениями содержимого дисплея
+    observer.observe(display, { childList: true });
+  </script>
 </body>
 </html>
